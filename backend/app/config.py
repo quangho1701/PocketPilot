@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     aws_access_key_id: str = ""
     aws_secret_access_key: str = ""
     bedrock_model_id: str = "anthropic.claude-3-sonnet-20240229-v1:0"
+    bedrock_embedding_model_id: str = "amazon.titan-embed-text-v2:0"
+    embedding_dimension: int = 1024
 
     @property
     def origins_list(self) -> list[str]:
