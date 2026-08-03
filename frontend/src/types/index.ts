@@ -33,9 +33,28 @@ export interface Goal {
 }
 
 export interface ChatMessage {
+  id: string;
   role: 'user' | 'assistant';
   content: string;
-  decision?: 'buy' | 'wait' | 'skip';
+  recommendation?: 'buy' | 'wait' | 'skip' | null;
+  reasoning?: string | null;
+  item_description?: string | null;
+  amount?: number | null;
+  category?: string | null;
+  decision_id?: string | null;
+  created_at: string;
+}
+
+export interface Conversation {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChatResponse {
+  conversation_id: string;
+  message: ChatMessage;
 }
 
 export interface ApiResponse<T> {

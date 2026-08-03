@@ -1,3 +1,10 @@
+from app.schemas.assistant import (
+    ChatMessageResponse,
+    ChatRequest,
+    ChatResponse,
+    ConversationResponse,
+    MessageDecisionRequest,
+)
 from app.schemas.common import (
     ErrorResponse,
     PaginatedResponse,
@@ -32,6 +39,11 @@ from app.schemas.user_profile import (
 )
 
 __all__ = [
+    "ChatMessageResponse",
+    "ChatRequest",
+    "ChatResponse",
+    "ConversationResponse",
+    "MessageDecisionRequest",
     "ErrorResponse",
     "PaginatedResponse",
     "PaginationParams",

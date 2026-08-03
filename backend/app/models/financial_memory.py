@@ -33,7 +33,9 @@ class FinancialMemory(Base, UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin
     user_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("users.id"), nullable=False
     )
-    memory_type: Mapped[MemoryType] = mapped_column(SAEnum(MemoryType), nullable=False)
+    memory_type: Mapped[MemoryType] = mapped_column(
+        SAEnum(MemoryType, values_callable=lambda x: [e.value for e in x]), nullable=False
+    )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
 
@@ -41,7 +43,8 @@ class FinancialMemory(Base, UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin
     category: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
     importance: Mapped[MemoryImportance] = mapped_column(
-        SAEnum(MemoryImportance), default=MemoryImportance.MEDIUM
+        SAEnum(MemoryImportance, values_callable=lambda x: [e.value for e in x]),
+        default=MemoryImportance.MEDIUM,
     )
     access_count: Mapped[int] = mapped_column(Integer, default=0)
     last_accessed_at: Mapped[Optional[datetime]] = mapped_column(

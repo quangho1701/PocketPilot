@@ -40,9 +40,13 @@ class SpendingPattern(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     user_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("users.id"), nullable=False
     )
-    pattern_type: Mapped[PatternType] = mapped_column(SAEnum(PatternType), nullable=False)
+    pattern_type: Mapped[PatternType] = mapped_column(
+        SAEnum(PatternType, values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+    )
     status: Mapped[PatternStatus] = mapped_column(
-        SAEnum(PatternStatus), default=PatternStatus.TENTATIVE
+        SAEnum(PatternStatus, values_callable=lambda x: [e.value for e in x]),
+        default=PatternStatus.TENTATIVE,
     )
 
     category: Mapped[str] = mapped_column(String(100), nullable=False)
