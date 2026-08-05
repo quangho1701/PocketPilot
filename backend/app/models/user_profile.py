@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import DateTime, Float, ForeignKey, JSON, String, Text
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
@@ -30,4 +30,11 @@ class UserProfile(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     behavior_profile: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     last_learning_update: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
+    )
+
+    financial_setup_completed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    financial_setup_version: Mapped[Optional[int]] = mapped_column(
+        Integer, nullable=True
     )

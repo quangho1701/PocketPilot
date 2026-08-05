@@ -1,7 +1,22 @@
 import axios from 'axios';
+import Constants from 'expo-constants';
+import { Platform } from 'react-native';
+
+function defaultApiBaseUrl(): string {
+  const hostUri = Constants.expoConfig?.hostUri?.replace(/^\w+:\/\//, '');
+  const metroHost = hostUri?.split(':')[0];
+  const androidLoopback =
+    Platform.OS === 'android' &&
+    (metroHost === 'localhost' || metroHost === '127.0.0.1');
+  if (__DEV__ && metroHost && !androidLoopback) return `http://${metroHost}:8000`;
+  if (__DEV__ && Platform.OS === 'android') return 'http://10.0.2.2:8000';
+  return 'http://localhost:8000';
+}
 
 const api = axios.create({
-  baseURL: process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:8000',
+  // An explicit URL always wins. In Expo development, derive the computer's
+  // Metro host so a physical phone does not try to call its own localhost.
+  baseURL: process.env.EXPO_PUBLIC_API_BASE_URL ?? defaultApiBaseUrl(),
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',

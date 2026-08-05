@@ -26,6 +26,12 @@ from app.schemas.spending_pattern import (
     SpendingPatternResponse,
     SpendingPatternsListResponse,
 )
+from app.schemas.setup import (
+    FinancialSetupPayload,
+    FinancialSetupResponse,
+    PrimaryGoalSetup,
+    RecurringExpenseSetup,
+)
 from app.schemas.user_decision import (
     DecisionFeedback,
     DecisionRecord,
@@ -59,6 +65,10 @@ __all__ = [
     "PatternFeedResponse",
     "SpendingPatternResponse",
     "SpendingPatternsListResponse",
+    "FinancialSetupPayload",
+    "FinancialSetupResponse",
+    "PrimaryGoalSetup",
+    "RecurringExpenseSetup",
     "DecisionFeedback",
     "DecisionRecord",
     "DecisionResponse",

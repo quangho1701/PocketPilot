@@ -29,6 +29,7 @@ class UserProfileUpdate(BaseModel):
     savings_priority: Optional[str] = None
     spending_categories: Optional[dict] = None
     notification_preferences: Optional[dict] = None
+    currency: Optional[str] = Field(default=None, max_length=3)
     financial_situation_notes: Optional[str] = None
 
 
@@ -43,6 +44,9 @@ class UserProfileResponse(BaseModel):
     spending_categories: Optional[dict]
     notification_preferences: Optional[dict]
     behavior_profile: Optional[dict]
+    financial_situation_notes: Optional[str] = None
+    financial_setup_completed_at: Optional[datetime] = None
+    financial_setup_version: Optional[int] = None
     created_at: datetime
     updated_at: datetime
 
