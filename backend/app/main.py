@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import memory, assistant, budget, transactions
+from app.routers import assistant, budget, memory, setup, transactions
 
 
 def create_app() -> FastAPI:
@@ -24,6 +24,9 @@ def create_app() -> FastAPI:
     app.include_router(assistant.router, prefix="/api/v1/assistant", tags=["Assistant"])
     app.include_router(budget.router, prefix="/api/v1/budget", tags=["Budget"])
     app.include_router(transactions.router, prefix="/api/v1/transactions", tags=["Transactions"])
+    app.include_router(
+        setup.router, prefix="/api/v1/setup", tags=["Financial Setup"]
+    )
 
     @app.get("/health", tags=["Health"])
     async def health_check():

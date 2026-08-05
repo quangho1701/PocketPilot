@@ -241,6 +241,7 @@ class AssistantService:
                     "content": m.content,
                     "amount": m.amount,
                     "category": m.category,
+                    "details": m.details,
                 }
                 for m in memories
             ]

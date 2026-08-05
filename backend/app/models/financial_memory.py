@@ -4,7 +4,17 @@ import enum
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import DateTime, Enum as SAEnum, Float, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import (
+    DateTime,
+    Enum as SAEnum,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    JSON,
+    String,
+    Text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, SoftDeleteMixin, TimestampMixin, UUIDPrimaryKeyMixin
@@ -41,6 +51,7 @@ class FinancialMemory(Base, UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin
 
     amount: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     category: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    details: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
     importance: Mapped[MemoryImportance] = mapped_column(
         SAEnum(MemoryImportance, values_callable=lambda x: [e.value for e in x]),
@@ -62,6 +73,9 @@ class FinancialMemory(Base, UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin
         Index("idx_fm_user_type", "user_id", "memory_type"),
         Index("idx_fm_user_category", "user_id", "category"),
         Index("idx_fm_user_not_deleted", "user_id", "is_deleted"),
+        Index(
+            "idx_fm_user_source_not_deleted", "user_id", "source", "is_deleted"
+        ),
     )
 
 
