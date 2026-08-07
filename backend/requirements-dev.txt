@@ -1,0 +1,4 @@
+-r requirements.txt
+
+# Async SQLite driver used by the isolated setup service/API integration tests.
+aiosqlite==0.20.0

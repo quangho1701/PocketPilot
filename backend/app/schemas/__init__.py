@@ -1,3 +1,10 @@
+from app.schemas.assistant import (
+    ChatMessageResponse,
+    ChatRequest,
+    ChatResponse,
+    ConversationResponse,
+    MessageDecisionRequest,
+)
 from app.schemas.common import (
     ErrorResponse,
     PaginatedResponse,
@@ -19,6 +26,12 @@ from app.schemas.spending_pattern import (
     SpendingPatternResponse,
     SpendingPatternsListResponse,
 )
+from app.schemas.setup import (
+    FinancialSetupPayload,
+    FinancialSetupResponse,
+    PrimaryGoalSetup,
+    RecurringExpenseSetup,
+)
 from app.schemas.user_decision import (
     DecisionFeedback,
     DecisionRecord,
@@ -39,6 +52,11 @@ from app.schemas.budget import (
 )
 
 __all__ = [
+    "ChatMessageResponse",
+    "ChatRequest",
+    "ChatResponse",
+    "ConversationResponse",
+    "MessageDecisionRequest",
     "ErrorResponse",
     "PaginatedResponse",
     "PaginationParams",
@@ -54,6 +72,10 @@ __all__ = [
     "PatternFeedResponse",
     "SpendingPatternResponse",
     "SpendingPatternsListResponse",
+    "FinancialSetupPayload",
+    "FinancialSetupResponse",
+    "PrimaryGoalSetup",
+    "RecurringExpenseSetup",
     "DecisionFeedback",
     "DecisionRecord",
     "DecisionResponse",

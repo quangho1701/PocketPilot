@@ -33,15 +33,18 @@ class UserDecision(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     category: Mapped[str] = mapped_column(String(100), nullable=False)
 
     ai_recommendation: Mapped[DecisionType] = mapped_column(
-        SAEnum(DecisionType), nullable=False
+        SAEnum(DecisionType, values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
     )
     ai_reasoning: Mapped[str] = mapped_column(Text, nullable=False)
 
     user_decision: Mapped[DecisionType] = mapped_column(
-        SAEnum(DecisionType), nullable=False
+        SAEnum(DecisionType, values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
     )
     outcome: Mapped[DecisionOutcome] = mapped_column(
-        SAEnum(DecisionOutcome), default=DecisionOutcome.PENDING
+        SAEnum(DecisionOutcome, values_callable=lambda x: [e.value for e in x]),
+        default=DecisionOutcome.PENDING,
     )
 
     context_snapshot: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)

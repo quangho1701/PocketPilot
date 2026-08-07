@@ -17,6 +17,7 @@ class MemoryCreate(BaseModel):
     content: str
     amount: Optional[float] = None
     category: Optional[str] = Field(default=None, max_length=100)
+    details: Optional[dict] = None
     importance: MemoryImportance = MemoryImportance.MEDIUM
     source: Optional[str] = None
     source_id: Optional[str] = None
@@ -27,6 +28,7 @@ class MemoryUpdate(BaseModel):
     content: Optional[str] = None
     amount: Optional[float] = None
     category: Optional[str] = None
+    details: Optional[dict] = None
     importance: Optional[MemoryImportance] = None
 
 
@@ -65,6 +67,7 @@ class MemoryResponse(BaseModel):
     content: str
     amount: Optional[float]
     category: Optional[str]
+    details: Optional[dict] = None
     importance: MemoryImportance
     access_count: int
     source: Optional[str]

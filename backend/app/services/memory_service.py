@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import math
 from datetime import datetime, timezone
@@ -24,6 +25,10 @@ from app.services.embedding_service import EmbeddingService
 logger = logging.getLogger(__name__)
 
 
+class SetupManagedMemoryError(ValueError):
+    """Raised when generic memory CRUD targets setup-owned records."""
+
+
 class MemoryService:
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -32,6 +37,10 @@ class MemoryService:
     # --- CRUD ---
 
     async def create_memory(self, user_id: str, data: MemoryCreate) -> FinancialMemory:
+        if data.source == "financial_setup":
+            raise SetupManagedMemoryError(
+                "Financial setup memories must be created through PUT /api/v1/setup"
+            )
         memory = FinancialMemory(
             user_id=user_id,
             **data.model_dump(),
@@ -73,6 +82,10 @@ class MemoryService:
         memory = await self.get_memory(user_id, memory_id)
         if not memory:
             return None
+        if memory.source == "financial_setup":
+            raise SetupManagedMemoryError(
+                "Financial setup memories must be updated through PUT /api/v1/setup"
+            )
 
         update_data = data.model_dump(exclude_none=True)
         content_changed = "content" in update_data or "title" in update_data
@@ -94,6 +107,10 @@ class MemoryService:
         memory = await self.get_memory(user_id, memory_id)
         if not memory:
             return False
+        if memory.source == "financial_setup":
+            raise SetupManagedMemoryError(
+                "Financial setup memories must be deleted through PUT /api/v1/setup"
+            )
         memory.is_deleted = True
         memory.deleted_at = datetime.now(timezone.utc)
         await self.db.flush()
@@ -206,5 +223,16 @@ class MemoryService:
         if memory.category:
             parts.append(f"Category: {memory.category}")
         if memory.amount is not None:
-            parts.append(f"Amount: ${memory.amount:.2f}")
+            currency = (memory.details or {}).get("currency", "USD")
+            parts.append(f"Amount: {memory.amount:.2f} {currency}")
+        if memory.details:
+            parts.append(
+                "Details: "
+                + json.dumps(
+                    memory.details,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    default=str,
+                )
+            )
         return " | ".join(parts)

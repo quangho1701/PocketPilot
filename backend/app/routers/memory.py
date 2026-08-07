@@ -26,8 +26,11 @@ from app.schemas.user_decision import (
 )
 from app.schemas.user_profile import UserProfileCreate, UserProfileResponse, UserProfileUpdate
 from app.services.learning_service import LearningService
-from app.services.memory_service import MemoryService
-from app.services.user_profile_service import UserProfileService
+from app.services.memory_service import MemoryService, SetupManagedMemoryError
+from app.services.user_profile_service import (
+    SetupManagedProfileError,
+    UserProfileService,
+)
 
 router = APIRouter()
 
@@ -65,54 +68,13 @@ async def create_memory(
 ):
     """Create a new financial memory with automatic embedding generation."""
     svc = MemoryService(db)
-    memory = await svc.create_memory_with_embedding(user_id, data)
+    try:
+        memory = await svc.create_memory_with_embedding(user_id, data)
+    except SetupManagedMemoryError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     await db.commit()
     return memory
-
-
-@router.get("/{memory_id}", response_model=MemoryResponse)
-async def get_memory(
-    memory_id: str,
-    user_id: str,
-    db: AsyncSession = Depends(get_db),
-):
-    """Retrieve a specific memory."""
-    svc = MemoryService(db)
-    memory = await svc.get_memory(user_id, memory_id)
-    if not memory:
-        raise HTTPException(status_code=404, detail="Memory not found")
-    await db.commit()
-    return memory
-
-
-@router.patch("/{memory_id}", response_model=MemoryResponse)
-async def update_memory(
-    memory_id: str,
-    user_id: str,
-    data: MemoryUpdate,
-    db: AsyncSession = Depends(get_db),
-):
-    """Update a memory and re-generate its embedding if content changed."""
-    svc = MemoryService(db)
-    memory = await svc.update_memory(user_id, memory_id, data)
-    if not memory:
-        raise HTTPException(status_code=404, detail="Memory not found")
-    await db.commit()
-    return memory
-
-
-@router.delete("/{memory_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_memory(
-    memory_id: str,
-    user_id: str,
-    db: AsyncSession = Depends(get_db),
-):
-    """Soft-delete a memory."""
-    svc = MemoryService(db)
-    deleted = await svc.delete_memory(user_id, memory_id)
-    if not deleted:
-        raise HTTPException(status_code=404, detail="Memory not found")
-    await db.commit()
 
 
 # ============= SEMANTIC SEARCH =============
@@ -212,7 +174,11 @@ async def update_profile(
 ):
     """Update user's financial profile."""
     svc = UserProfileService(db)
-    profile = await svc.update_profile(user_id, data)
+    try:
+        profile = await svc.update_profile(user_id, data)
+    except SetupManagedProfileError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     await db.commit()
     return profile
 
@@ -332,3 +298,61 @@ async def get_predictions(
     svc = LearningService(db)
     predictions = await svc.predict_upcoming_expenses(user_id, days_ahead)
     return {"predictions": predictions, "days_ahead": days_ahead}
+
+
+# ============= MEMORY CRUD BY ID =============
+# Keep these catch-all routes after every named path such as /profile, /patterns,
+# and /decisions so Starlette does not interpret a static segment as a memory ID.
+
+
+@router.get("/{memory_id}", response_model=MemoryResponse)
+async def get_memory(
+    memory_id: str,
+    user_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Retrieve a specific memory."""
+    svc = MemoryService(db)
+    memory = await svc.get_memory(user_id, memory_id)
+    if not memory:
+        raise HTTPException(status_code=404, detail="Memory not found")
+    await db.commit()
+    return memory
+
+
+@router.patch("/{memory_id}", response_model=MemoryResponse)
+async def update_memory(
+    memory_id: str,
+    user_id: str,
+    data: MemoryUpdate,
+    db: AsyncSession = Depends(get_db),
+):
+    """Update a memory and re-generate its embedding if content changed."""
+    svc = MemoryService(db)
+    try:
+        memory = await svc.update_memory(user_id, memory_id, data)
+    except SetupManagedMemoryError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if not memory:
+        raise HTTPException(status_code=404, detail="Memory not found")
+    await db.commit()
+    return memory
+
+
+@router.delete("/{memory_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_memory(
+    memory_id: str,
+    user_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Soft-delete a memory."""
+    svc = MemoryService(db)
+    try:
+        deleted = await svc.delete_memory(user_id, memory_id)
+    except SetupManagedMemoryError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Memory not found")
+    await db.commit()

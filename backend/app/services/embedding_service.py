@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.models.financial_memory import FinancialMemory, MemoryType
 from app.models.memory_embedding import MemoryEmbedding
-from app.utils.bedrock import embedding_client
+from app.utils.llm import embedding_client
 
 logger = logging.getLogger(__name__)
 

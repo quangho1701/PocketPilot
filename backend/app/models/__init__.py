@@ -7,6 +7,7 @@ from app.models.spending_pattern import PatternStatus, PatternType, SpendingPatt
 from app.models.user_decision import DecisionOutcome, DecisionType, UserDecision
 from app.models.budget import Budget
 from app.models.budget_allocation import BudgetAllocation
+from app.models.chat import ChatConversation, ChatMessage
 
 __all__ = [
     "Base",
@@ -27,4 +28,6 @@ __all__ = [
     "DecisionOutcome",
     "Budget",
     "BudgetAllocation",
+    "ChatConversation",
+    "ChatMessage",
 ]
