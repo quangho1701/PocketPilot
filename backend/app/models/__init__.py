@@ -5,6 +5,8 @@ from app.models.memory_embedding import MemoryEmbedding
 from app.models.user_profile import UserProfile
 from app.models.spending_pattern import PatternStatus, PatternType, SpendingPattern
 from app.models.user_decision import DecisionOutcome, DecisionType, UserDecision
+from app.models.budget import Budget
+from app.models.budget_allocation import BudgetAllocation
 
 __all__ = [
     "Base",
@@ -23,4 +25,6 @@ __all__ = [
     "UserDecision",
     "DecisionType",
     "DecisionOutcome",
+    "Budget",
+    "BudgetAllocation",
 ]
