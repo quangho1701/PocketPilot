@@ -1,11 +1,13 @@
 # Environment variables
+
 .env
 .env.local
-*.env
-!*.env.example
+*.env*
+*!*.env.example
 
 # Python
-__pycache__/
+
+**pycache**/
 *.py[cod]
 *.egg-info/
 .venv/
@@ -20,6 +22,7 @@ build/
 .ruff_cache/
 
 # Node / Expo
+
 frontend/node_modules/
 frontend/.expo/
 frontend/dist/
@@ -27,6 +30,7 @@ frontend/web-build/
 *.local
 
 # Editor / OS
+
 .vscode/*
 !.vscode/extensions.json
 .idea/
@@ -36,8 +40,5 @@ Thumbs.db
 *.swo
 
 # Docker
-*.log
 
-# Alembic
-backend/alembic/versions/*.py
-!backend/alembic/versions/.gitkeep
+*.log

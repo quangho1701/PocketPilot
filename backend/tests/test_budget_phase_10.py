@@ -41,9 +41,9 @@ async def test_detects_trajectory_discrepancies_and_rebalances():
             "planned_savings": 1000,
             "status": "active",
             "allocations": [
-                type("Allocation", (), {"id": "a1", "budget_id": "budget-1", "category_id": "dining", "allocated_amount": 300, "created_at": None, "updated_at": None})(),
-                type("Allocation", (), {"id": "a2", "budget_id": "budget-1", "category_id": "entertainment", "allocated_amount": 200, "created_at": None, "updated_at": None})(),
-                type("Allocation", (), {"id": "a3", "budget_id": "budget-1", "category_id": "housing", "allocated_amount": 2400, "created_at": None, "updated_at": None})(),
+                type("Allocation", (), {"id": "a1", "budget_id": "budget-1", "category_id": "cat-dining", "category_slug": "dining", "allocated_amount": 300, "created_at": None, "updated_at": None})(),
+                type("Allocation", (), {"id": "a2", "budget_id": "budget-1", "category_id": "cat-entertainment", "category_slug": "entertainment", "allocated_amount": 200, "created_at": None, "updated_at": None})(),
+                type("Allocation", (), {"id": "a3", "budget_id": "budget-1", "category_id": "cat-housing", "category_slug": "housing", "allocated_amount": 2400, "created_at": None, "updated_at": None})(),
             ],
             "created_at": None,
             "updated_at": None,
@@ -67,6 +67,6 @@ async def test_detects_trajectory_discrepancies_and_rebalances():
     )
 
     assert result["discrepancies"]
-    assert any(item["category_id"] == "dining" for item in result["discrepancies"])
+    assert any(item["category_slug"] == "dining" for item in result["discrepancies"])
     assert result["adjustments"]
-    assert any(item["category_id"] == "entertainment" for item in result["adjustments"])
+    assert any(item["category_slug"] == "entertainment" for item in result["adjustments"])
