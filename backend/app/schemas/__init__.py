@@ -43,6 +43,13 @@ from app.schemas.user_profile import (
     UserProfileResponse,
     UserProfileUpdate,
 )
+from app.schemas.budget import (
+    BudgetAllocationCreate,
+    BudgetAllocationResponse,
+    BudgetCreate,
+    BudgetResponse,
+    BudgetSimulationRequest,
+)
 
 __all__ = [
     "ChatMessageResponse",
@@ -76,4 +83,9 @@ __all__ = [
     "UserProfileCreate",
     "UserProfileResponse",
     "UserProfileUpdate",
+    "BudgetAllocationCreate",
+    "BudgetAllocationResponse",
+    "BudgetCreate",
+    "BudgetResponse",
+    "BudgetSimulationRequest",
 ]
