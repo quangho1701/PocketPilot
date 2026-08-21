@@ -11,3 +11,5 @@ aioboto3>=13.0.0
 pgvector>=0.3.0
 numpy>=1.26.0
 sqlalchemy-cockroachdb>=2.0.0
+PyJWT==2.9.0
+pwdlib[argon2]==0.2.1

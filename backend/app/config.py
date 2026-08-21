@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     bedrock_model_id: str = "anthropic.claude-3-sonnet-20240229-v1:0"
     bedrock_embedding_model_id: str = "amazon.titan-embed-text-v2:0"
     embedding_dimension: int = 1024
+    auth_secret_key: str = "dev-only-change-this-secret"
+    access_token_expire_minutes: int = 60
 
     @property
     def origins_list(self) -> list[str]:

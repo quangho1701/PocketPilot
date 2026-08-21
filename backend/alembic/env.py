@@ -1,7 +1,7 @@
 import asyncio
 from logging.config import fileConfig
 
-from sqlalchemy import pool
+from sqlalchemy import pool, text
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
@@ -53,6 +53,10 @@ async def run_async_migrations() -> None:
         connect_args={"ssl": False},
     )
     async with connectable.connect() as connection:
+        # CockroachDB schema changes must be committed outside weak-isolation
+        # transactions. Enable the session setting before Alembic starts.
+        await connection.execute(text("SET autocommit_before_ddl = true"))
+        await connection.commit()
         await connection.run_sync(do_run_migrations)
     await connectable.dispose()
 

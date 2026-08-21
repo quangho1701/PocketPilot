@@ -9,6 +9,7 @@ from app.models.budget import Budget
 from app.models.budget_allocation import BudgetAllocation
 from app.models.budget_category import BudgetCategory
 from app.models.chat import ChatConversation, ChatMessage
+from app.models.transaction import Transaction, TransactionSource, TransactionType
 
 __all__ = [
     "Base",
@@ -30,6 +31,9 @@ __all__ = [
     "Budget",
     "BudgetAllocation",
     "BudgetCategory",
+    "Transaction",
+    "TransactionSource",
+    "TransactionType",
     "ChatConversation",
     "ChatMessage",
 ]
