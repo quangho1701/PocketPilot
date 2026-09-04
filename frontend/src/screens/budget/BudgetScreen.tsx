@@ -1,5 +1,5 @@
 // Owner: Ha
-// Feature: Personalized Budget Planning + Goal Simulation
+// Feature: Personalized Budget Planning
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -33,8 +33,6 @@ const SAVINGS_RATES = {
   aggressive: 0.3,
 } as const;
 
-const SIMULATION_AMOUNTS = [0, 500_000, 1_000_000, 2_000_000];
-
 function clampPercent(value: number): number {
   return Math.max(0, Math.min(value, 100));
 }
@@ -44,7 +42,6 @@ export default function BudgetScreen({ navigation }: Props) {
   const [setupStatus, setSetupStatus] = useState<'not_started' | 'completed'>('completed');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [extraSaving, setExtraSaving] = useState(0);
   const hasSetup = useRef(false);
   const requestId = useRef(0);
 
@@ -58,7 +55,6 @@ export default function BudgetScreen({ navigation }: Props) {
       setSetupStatus(response.status);
       setSetup(response.data);
       hasSetup.current = Boolean(response.data);
-      setExtraSaving(0);
     } catch {
       if (activeRequest === requestId.current) setError(true);
     } finally {
@@ -94,14 +90,6 @@ export default function BudgetScreen({ navigation }: Props) {
       setup.primary_goal.target_amount - setup.primary_goal.current_amount,
       0
     );
-    const usableExtraSaving = Math.min(extraSaving, flexible);
-    const simulatedMonthlySaving = baseSaving + usableExtraSaving;
-    const months =
-      goalRemaining === 0
-        ? 0
-        : simulatedMonthlySaving > 0
-          ? Math.ceil(goalRemaining / simulatedMonthlySaving)
-          : null;
     return {
       fixed,
       afterFixed,
@@ -109,15 +97,13 @@ export default function BudgetScreen({ navigation }: Props) {
       flexible,
       rate,
       goalRemaining,
-      months,
-      simulatedMonthlySaving,
       fixedRatio: setup.monthly_income > 0 ? fixed / setup.monthly_income : 0,
       goalProgress:
         setup.primary_goal.target_amount > 0
           ? setup.primary_goal.current_amount / setup.primary_goal.target_amount
           : 0,
     };
-  }, [extraSaving, setup]);
+  }, [setup]);
 
   if (loading) {
     return (
@@ -164,7 +150,6 @@ export default function BudgetScreen({ navigation }: Props) {
   }
 
   const oversubscribed = plan.fixed > setup.monthly_income;
-  const goalComplete = plan.goalRemaining === 0;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -359,79 +344,6 @@ export default function BudgetScreen({ navigation }: Props) {
             <Text style={styles.goalTarget}>
               Đích {formatCompactVnd(setup.primary_goal.target_amount)}
             </Text>
-          </View>
-        </View>
-
-        <View style={styles.sectionHeading}>
-          <Text style={styles.sectionTitle}>Mô phỏng mục tiêu</Text>
-          <View style={styles.labBadge}>
-            <Ionicons name="flask-outline" size={13} color={COLORS.teal} />
-            <Text style={styles.labBadgeText}>THỬ NGHIỆM</Text>
-          </View>
-        </View>
-        <View style={styles.simulationCard}>
-          <Text style={styles.simulationQuestion}>
-            Nếu mỗi tháng bạn để dành thêm…
-          </Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.simulationOptions}
-          >
-            {SIMULATION_AMOUNTS.map((amount) => {
-              const selected = extraSaving === amount;
-              const disabled = amount > plan.flexible;
-              return (
-                <Pressable
-                  key={amount}
-                  onPress={() => setExtraSaving(amount)}
-                  disabled={disabled}
-                  style={[
-                    styles.simulationChip,
-                    selected && styles.simulationChipSelected,
-                    disabled && styles.simulationChipDisabled,
-                  ]}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected, disabled }}
-                  accessibilityLabel={amount === 0 ? 'Giữ kế hoạch gợi ý' : `Thêm ${formatVnd(amount)}`}
-                >
-                  <Text
-                    style={[
-                      styles.simulationChipText,
-                      selected && styles.simulationChipTextSelected,
-                    ]}
-                  >
-                    {amount === 0 ? 'Theo gợi ý' : `+${formatCompactVnd(amount)}`}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-          <View style={styles.simulationResult}>
-            <View style={styles.simulationResultIcon}>
-              <Ionicons
-                name={goalComplete ? 'checkmark-circle' : 'speedometer-outline'}
-                size={24}
-                color={COLORS.success}
-              />
-            </View>
-            <View style={styles.simulationResultCopy}>
-              <Text style={styles.simulationResultLabel}>
-                {goalComplete ? 'Mục tiêu đã hoàn thành' : 'Thời gian ước tính'}
-              </Text>
-              <Text style={styles.simulationResultValue}>
-                {goalComplete
-                  ? 'Tuyệt vời — hãy đặt một cột mốc mới.'
-                  : plan.months === null
-                    ? 'Cần dành một khoản hàng tháng'
-                    : `Khoảng ${plan.months} tháng để chạm mục tiêu`}
-              </Text>
-              {!goalComplete ? (
-                <Text style={styles.simulationResultMeta}>
-                  Dành {formatVnd(plan.simulatedMonthlySaving)}/tháng · chưa tính lãi suất
-                </Text>
-              ) : null}
-            </View>
           </View>
         </View>
 
@@ -664,56 +576,6 @@ const styles = StyleSheet.create({
   goalAmounts: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
   goalCurrent: { color: COLORS.textSecondary, fontSize: 10 },
   goalTarget: { color: COLORS.textMuted, fontSize: 10 },
-  labBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 8,
-    backgroundColor: COLORS.mintSoft,
-    paddingHorizontal: 7,
-    paddingVertical: 5,
-  },
-  labBadgeText: { color: COLORS.teal, fontSize: 8, fontWeight: '900', marginLeft: 4 },
-  simulationCard: {
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 19,
-    backgroundColor: COLORS.surface,
-    padding: 15,
-  },
-  simulationQuestion: { color: COLORS.text, fontSize: 13, fontWeight: '700' },
-  simulationOptions: { gap: 7, paddingVertical: 12 },
-  simulationChip: {
-    minHeight: 38,
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.borderStrong,
-    borderRadius: 12,
-    backgroundColor: COLORS.surfaceMuted,
-    paddingHorizontal: 12,
-  },
-  simulationChipSelected: { borderColor: COLORS.teal, backgroundColor: COLORS.mint },
-  simulationChipDisabled: { opacity: 0.38 },
-  simulationChipText: { color: COLORS.textSecondary, fontSize: 11, fontWeight: '700' },
-  simulationChipTextSelected: { color: COLORS.tealDark },
-  simulationResult: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 15,
-    backgroundColor: COLORS.mintSoft,
-    padding: 12,
-  },
-  simulationResultIcon: {
-    width: 42,
-    height: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 14,
-    backgroundColor: COLORS.surface,
-  },
-  simulationResultCopy: { flex: 1, marginLeft: 10 },
-  simulationResultLabel: { color: COLORS.textSecondary, fontSize: 9, marginBottom: 2 },
-  simulationResultValue: { color: COLORS.text, fontSize: 13, lineHeight: 18, fontWeight: '800' },
-  simulationResultMeta: { color: COLORS.textSecondary, fontSize: 9, marginTop: 3 },
   disclaimer: {
     color: COLORS.textMuted,
     fontSize: 9,

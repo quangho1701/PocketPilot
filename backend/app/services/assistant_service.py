@@ -14,7 +14,10 @@ from app.models.chat import ChatConversation, ChatMessage
 from app.models.user import User
 from app.models.user_decision import DecisionType, UserDecision
 from app.schemas.assistant import ChatMessageResponse, ChatRequest, ChatResponse
+from app.schemas.goal_simulation import GoalSimulationRequest, GoalSimulationResult
 from app.schemas.user_decision import DecisionRecord
+from app.services.goal_simulation_intent import GoalSimulationIntentResolver
+from app.services.goal_simulation_service import GoalSimulationService
 from app.services.learning_service import LearningService
 from app.services.memory_service import MemoryService
 from app.services.user_profile_service import UserProfileService
@@ -41,6 +44,18 @@ budget, upcoming expenses, and past behavior.
 - "recommendation", "reasoning", "item_description", "amount" and "category" must all be set for \
 purchase decisions, and all null otherwise."""
 
+SIMULATION_EXPLANATION_PROMPT = """You are PocketPilot. Explain the deterministic Goal Simulation result below.
+
+SIMULATION RESULT (source of truth):
+{simulation_result}
+
+INSTRUCTIONS:
+- Explain only values present in the simulation result. Do not calculate, change, or invent monetary amounts, dates, or feasibility.
+- State the relevant assumption or warning concisely when present.
+- Respond with JSON ONLY — no markdown fences, no text outside the JSON object:
+{{"reply": "<conversational explanation>", "recommendation": null, "reasoning": null, "item_description": null, "amount": null, "category": null}}
+"""
+
 
 class AssistantService:
     def __init__(self, db: AsyncSession):
@@ -65,6 +80,41 @@ class AssistantService:
         self.db.add(user_message)
         await self.db.flush()
 
+        previous_simulation = await self._get_latest_simulation(conversation.id)
+        intent = await GoalSimulationIntentResolver(self.db).resolve(
+            user_id,
+            request.message,
+            previous_simulation_input=previous_simulation.simulation_input if previous_simulation else None,
+            previous_simulation_result=previous_simulation.simulation_result if previous_simulation else None,
+        )
+        if intent is not None:
+            if intent.clarification:
+                return await self._store_assistant_message(conversation.id, {"reply": intent.clarification})
+
+            simulation_request = GoalSimulationRequest(
+                target_goal_id=intent.goal_id,
+                scenario=intent.scenario,
+                target_date=intent.target_date,
+            )
+            try:
+                simulation_result = await GoalSimulationService(self.db).simulate(
+                    user_id, simulation_request
+                )
+            except ValueError as exc:
+                return await self._store_assistant_message(
+                    conversation.id, {"reply": f"I can't run this simulation yet: {exc}."}
+                )
+
+            history = await self._build_message_history(conversation.id)
+            parsed = await self._generate_simulation_explanation(history, simulation_result)
+            return await self._store_assistant_message(
+                conversation.id,
+                parsed,
+                simulation_input=simulation_request.model_dump(mode="json"),
+                simulation_result=simulation_result.model_dump(mode="json"),
+                simulation_schema_version=simulation_result.schema_version,
+            )
+
         context = await self._gather_context(user_id, request.message)
         system_prompt = SYSTEM_PROMPT_TEMPLATE.format(
             context_block=self._format_context(context)
@@ -87,24 +137,10 @@ class AssistantService:
 
         parsed = self._parse_model_reply(raw_reply)
 
-        assistant_message = ChatMessage(
-            conversation_id=conversation.id,
-            role="assistant",
-            content=parsed["reply"],
-            recommendation=parsed["recommendation"],
-            reasoning=parsed["reasoning"],
-            item_description=parsed["item_description"],
-            amount=parsed["amount"],
-            category=parsed["category"],
+        return await self._store_assistant_message(
+            conversation.id,
+            parsed,
             context_snapshot=context if parsed["recommendation"] else None,
-            created_at=datetime.now(timezone.utc),
-        )
-        self.db.add(assistant_message)
-        await self.db.flush()
-
-        return ChatResponse(
-            conversation_id=conversation.id,
-            message=ChatMessageResponse.model_validate(assistant_message),
         )
 
     # --- Decision recording (closes the adaptive-learning loop) ---
@@ -168,6 +204,54 @@ class AssistantService:
 
     # --- Private helpers ---
 
+    async def _generate_simulation_explanation(
+        self, history: list[dict], simulation_result: GoalSimulationResult
+    ) -> dict:
+        try:
+            raw_reply = await llm_client.invoke_model(
+                messages=history,
+                system=SIMULATION_EXPLANATION_PROMPT.format(
+                    simulation_result=json.dumps(simulation_result.model_dump(mode="json"))
+                ),
+                temperature=0.0,
+            )
+        except Exception as exc:
+            logger.exception("Simulation explanation invocation failed")
+            raise RuntimeError("AI service temporarily unavailable.") from exc
+        return self._parse_model_reply(raw_reply)
+
+    async def _store_assistant_message(
+        self,
+        conversation_id: str,
+        parsed: dict,
+        *,
+        context_snapshot: dict | None = None,
+        simulation_input: dict | None = None,
+        simulation_result: dict | None = None,
+        simulation_schema_version: int | None = None,
+    ) -> ChatResponse:
+        assistant_message = ChatMessage(
+            conversation_id=conversation_id,
+            role="assistant",
+            content=parsed["reply"],
+            recommendation=parsed.get("recommendation"),
+            reasoning=parsed.get("reasoning"),
+            item_description=parsed.get("item_description"),
+            amount=parsed.get("amount"),
+            category=parsed.get("category"),
+            context_snapshot=context_snapshot,
+            simulation_input=simulation_input,
+            simulation_result=simulation_result,
+            simulation_schema_version=simulation_schema_version,
+            created_at=datetime.now(timezone.utc),
+        )
+        self.db.add(assistant_message)
+        await self.db.flush()
+        return ChatResponse(
+            conversation_id=conversation_id,
+            message=ChatMessageResponse.model_validate(assistant_message),
+        )
+
     async def _get_or_create_user(self, user_id: str) -> User:
         result = await self.db.execute(select(User).where(User.id == user_id))
         user = result.scalar_one_or_none()
@@ -181,6 +265,19 @@ class AssistantService:
         self.db.add(user)
         await self.db.flush()
         return user
+
+    async def _get_latest_simulation(self, conversation_id: str) -> ChatMessage | None:
+        result = await self.db.execute(
+            select(ChatMessage)
+            .where(
+                ChatMessage.conversation_id == conversation_id,
+                ChatMessage.simulation_input.is_not(None),
+                ChatMessage.simulation_result.is_not(None),
+            )
+            .order_by(ChatMessage.created_at.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
 
     async def _get_conversation(
         self, user_id: str, conversation_id: str

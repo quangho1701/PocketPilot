@@ -71,13 +71,6 @@ class BudgetResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class BudgetSimulationRequest(BaseModel):
-    target_amount: float = Field(ge=0)
-    monthly_contribution: float = Field(ge=0)
-    months: int = Field(ge=1, le=120)
-    current_savings: float = Field(ge=0)
-
-
 class BudgetAllocationProposal(BaseModel):
     category_slug: Optional[str] = Field(default=None, min_length=1, max_length=80)
     category_id: Optional[str] = Field(default=None, min_length=1, max_length=80)

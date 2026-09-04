@@ -47,6 +47,9 @@ class ChatMessage(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     amount: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     category: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     context_snapshot: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    simulation_input: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    simulation_result: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    simulation_schema_version: Mapped[Optional[int]] = mapped_column(nullable=True)
 
     # Set once the user confirms what they actually did (closes the learning loop)
     decision_id: Mapped[Optional[str]] = mapped_column(

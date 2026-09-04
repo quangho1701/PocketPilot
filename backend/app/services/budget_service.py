@@ -1,5 +1,5 @@
 # Owner: Ha
-# Business logic for Personalized Budget Planning + Goal Simulation
+# Business logic for Personalized Budget Planning
 from __future__ import annotations
 
 import json
@@ -48,6 +48,7 @@ VALID_MAPPING_GROUPS = {"needs", "wants", "savings"}
 
 
 def _calculate_goal_savings(goals: list[dict], target_income: float) -> float:
+    """Derive a goal-aware minimum savings floor for budget proposals."""
     if not goals:
         return 0.0
 

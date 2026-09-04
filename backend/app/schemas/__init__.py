@@ -48,7 +48,6 @@ from app.schemas.budget import (
     BudgetAllocationResponse,
     BudgetCreate,
     BudgetResponse,
-    BudgetSimulationRequest,
 )
 
 __all__ = [
@@ -87,5 +86,4 @@ __all__ = [
     "BudgetAllocationResponse",
     "BudgetCreate",
     "BudgetResponse",
-    "BudgetSimulationRequest",
 ]
