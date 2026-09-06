@@ -1,20 +1,32 @@
-# Owner: Hoang Anh
-# Feature: OCR Expense Categorization + Transaction Management & Dashboard UI
-from fastapi import APIRouter
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Query, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.database import get_db
+from app.schemas.transaction import TransactionCreate, TransactionResponse
+from app.services.transaction_service import TransactionService
 
 router = APIRouter()
 
 
-@router.get("/")
-async def list_transactions():
-    # TODO: return paginated transaction list
-    return {"status": "not_implemented"}
+UserId = Annotated[str, Query(min_length=1, max_length=36)]
 
 
-@router.post("/")
-async def create_transaction():
-    # TODO: manually add a transaction
-    return {"status": "not_implemented"}
+@router.get("/", response_model=list[TransactionResponse])
+async def list_transactions(user_id: UserId, db: AsyncSession = Depends(get_db)):
+    return await TransactionService(db).list_transactions(user_id)
+
+
+@router.post("/", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)
+async def create_transaction(
+    data: TransactionCreate,
+    user_id: UserId,
+    db: AsyncSession = Depends(get_db),
+):
+    transaction = await TransactionService(db).create_transaction(user_id, data)
+    await db.commit()
+    return transaction
 
 
 @router.post("/ocr")

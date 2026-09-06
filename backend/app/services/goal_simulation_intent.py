@@ -16,12 +16,20 @@ from app.schemas.goal_simulation import (
     ScenarioType,
 )
 
-_AMOUNT_PATTERN = re.compile(r"(?:\$|₫)?\s*(\d[\d,._]*)\s*(?:VND|₫)?", re.IGNORECASE)
+_AMOUNT_PATTERN = re.compile(
+    r"(?:\$|₫)?\s*(\d+(?:[.,]\d+)*)\s*(k|m|nghìn|ngàn|triệu|VND|₫)?",
+    re.IGNORECASE,
+)
 _DATE_PATTERN = re.compile(r"\b(\d{4}-\d{2}-\d{2})\b")
-_RECURRING_PATTERN = re.compile(r"\b(?:every|per|a)\s+(week|month)\b", re.IGNORECASE)
-_SAVINGS_PATTERN = re.compile(r"\b(?:save|saving|set aside)\b", re.IGNORECASE)
-_EXPENSE_PATTERN = re.compile(r"\b(?:spend|spending|buy|purchase)\b", re.IGNORECASE)
+_RECURRING_PATTERN = re.compile(r"\b(?:every|per|a)\s+(week|month)\b|mỗi\s+(tuần|tháng)", re.IGNORECASE)
+_SAVINGS_PATTERN = re.compile(r"\b(?:save|saving|set aside)\b|để dành|tiết kiệm", re.IGNORECASE)
+_EXPENSE_PATTERN = re.compile(r"\b(?:spend|spending|buy|purchase)\b|\bchi\b|\bmua\b", re.IGNORECASE)
 _OFFSET_PATTERN = re.compile(r"\b(?:offset that|make up for that|how much more.*save)\b", re.IGNORECASE)
+_SIMULATION_CONTEXT_PATTERN = re.compile(
+    r"\b(?:if|what if|affect|impact|goal|target|reach|delay|future plan|scenario)\b"
+    r"|nếu|mục tiêu|ảnh hưởng|tác động|thay đổi|chậm|bao giờ|khi nào|kế hoạch",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -66,7 +74,7 @@ class GoalSimulationIntentResolver:
 
         goals = await self._get_active_goals(user_id)
         goal_id, goal_clarification = self._resolve_goal(message, goals)
-        if previous_request and goal_id is None and goal_clarification == "Which goal would you like me to simulate?":
+        if previous_request and goal_id is None and goal_clarification == "Bạn muốn mô phỏng mục tiêu nào?":
             goal_id = previous_request.target_goal_id
             goal_clarification = None
         return GoalSimulationIntent(
@@ -79,18 +87,20 @@ class GoalSimulationIntentResolver:
     def _parse_scenario(
         self, message: str
     ) -> tuple[GoalSimulationScenario | None, date | None, str | None]:
+        if not _SIMULATION_CONTEXT_PATTERN.search(message):
+            return None, None, None
         deadline_match = _DATE_PATTERN.search(message)
         deadline = date.fromisoformat(deadline_match.group(1)) if deadline_match else None
         amount_message = _DATE_PATTERN.sub("", message)
         amount_match = _AMOUNT_PATTERN.search(amount_message)
         if not amount_match:
             if _SAVINGS_PATTERN.search(message) or _EXPENSE_PATTERN.search(message):
-                return None, None, "What amount would you like to simulate?"
+                return None, None, "Bạn muốn mô phỏng số tiền bao nhiêu?"
             return None, None, None
 
-        amount = int(re.sub(r"[,_ .]", "", amount_match.group(1)))
+        amount = self._parse_amount(amount_match.group(1), amount_match.group(2))
         if re.search(r"\bby\s+\w+\b", message, re.IGNORECASE) and deadline is None:
-            return None, None, "Please provide the target deadline as a specific date, such as 2027-06-30."
+            return None, None, "Vui lòng nhập thời hạn cụ thể, ví dụ 2027-06-30."
 
         recurring_match = _RECURRING_PATTERN.search(message)
         if _SAVINGS_PATTERN.search(message):
@@ -103,7 +113,8 @@ class GoalSimulationIntentResolver:
                 None,
             )
         if recurring_match and _EXPENSE_PATTERN.search(message):
-            frequency = ScenarioFrequency(recurring_match.group(1).lower() + "ly")
+            frequency_value = recurring_match.group(1) or recurring_match.group(2)
+            frequency = ScenarioFrequency.WEEKLY if frequency_value.lower() == "tuần" else ScenarioFrequency.MONTHLY if frequency_value.lower() == "tháng" else ScenarioFrequency(frequency_value.lower() + "ly")
             return (
                 GoalSimulationScenario(
                     scenario_type=ScenarioType.RECURRING_EXPENSE,
@@ -123,6 +134,21 @@ class GoalSimulationIntentResolver:
                 None,
             )
         return None, deadline, None
+
+    @staticmethod
+    def _parse_amount(raw_number: str, raw_suffix: str | None) -> int:
+        suffix = (raw_suffix or "").lower()
+        multiplier = 1
+        if suffix in {"k", "nghìn", "ngàn"}:
+            multiplier = 1_000
+        elif suffix in {"m", "triệu"}:
+            multiplier = 1_000_000
+
+        if multiplier > 1:
+            return int(round(float(raw_number.replace(",", ".")) * multiplier))
+        if ("." in raw_number or "," in raw_number) and len(re.split(r"[.,]", raw_number)[-1]) == 3:
+            return int(re.sub(r"[.,]", "", raw_number))
+        return int(round(float(raw_number.replace(",", "."))))
 
     @staticmethod
     def _parse_previous_request(data: dict | None) -> GoalSimulationRequest | None:
@@ -174,9 +200,9 @@ class GoalSimulationIntentResolver:
         if len(matches) == 1:
             return matches[0].id, None
         if len(matches) > 1:
-            return None, "Which goal would you like me to simulate?"
+            return None, "Bạn muốn mô phỏng mục tiêu nào?"
         if len(goals) == 1:
             return goals[0].id, None
         if not goals:
-            return None, "I could not find an active financial goal to simulate."
-        return None, "Which goal would you like me to simulate?"
+            return None, "Chưa có mục tiêu tài chính đang hoạt động để mô phỏng."
+        return None, "Bạn muốn mô phỏng mục tiêu nào?"

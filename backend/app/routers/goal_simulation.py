@@ -25,4 +25,9 @@ async def simulate_goal(
     except ValueError as exc:
         detail = str(exc)
         status_code = 404 if detail == "active goal not found" else 409
-        raise HTTPException(status_code=status_code, detail=detail) from exc
+        localized_detail = {
+            "active goal not found": "Không tìm thấy mục tiêu đang hoạt động.",
+            "goal is not active": "Mục tiêu này không còn hoạt động.",
+            "active budget not found for the current month": "Bạn cần áp dụng ngân sách tháng này trước khi mô phỏng mục tiêu.",
+        }.get(detail, "Chưa thể mô phỏng với dữ liệu hiện tại. Vui lòng kiểm tra lại thông tin.")
+        raise HTTPException(status_code=status_code, detail=localized_detail) from exc

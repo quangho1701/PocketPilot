@@ -1,51 +1,22 @@
-import type { ViewStyle } from 'react-native';
+import type { TextStyle, ViewStyle } from 'react-native';
+
+// PocketPilot editorial ledger system. Fonts gracefully fall back on platforms
+// where the supplied design-font files are not installed.
+export const FONTS = { display: 'Georgia', body: 'System', mono: 'monospace' } as const;
 
 export const COLORS = {
-  ink: '#102A43',
-  inkStrong: '#071B2D',
-  navy: '#0B2B40',
-  navySoft: '#123A52',
-  teal: '#0F766E',
-  tealDark: '#0B5D57',
-  mint: '#DDF5ED',
-  mintSoft: '#EFFAF6',
-  sky: '#E8F3F8',
-  amber: '#D97706',
-  amberSoft: '#FFF6DF',
-  coral: '#D95D4F',
-  coralSoft: '#FFF0ED',
-  background: '#F4F7F6',
-  surface: '#FFFFFF',
-  surfaceMuted: '#F8FAF9',
-  text: '#102A43',
-  textSecondary: '#627386',
-  textMuted: '#94A3B1',
-  border: '#DDE6E4',
-  borderStrong: '#C8D5D2',
-  success: '#147D64',
-  error: '#C2413B',
-  errorSoft: '#FFF0EE',
+  parchment: '#EEE4C9', parchmentDeep: '#E6D9B8', ink: '#1E2A32', inkStrong: '#17251D', inkSoft: '#3A4750', navy: '#17251D', navySoft: '#23392E',
+  green: '#23392E', greenDeep: '#17251D', oxblood: '#6E2B32', brass: '#A9843F', brassSoft: '#F3E6C6',
+  rule: 'rgba(30,42,50,0.28)', surface: '#F8F1DE', surfaceMuted: '#EDE1C5', background: '#EEE4C9',
+  text: '#1E2A32', textSecondary: '#3A4750', textMuted: '#667076', border: 'rgba(30,42,50,0.28)', borderStrong: '#1E2A32',
+  teal: '#23392E', tealDark: '#17251D', mint: '#DEE6D7', mintSoft: '#E9EEE2', sky: '#E8E1D0',
+  amber: '#856404', amberSoft: '#F3E6C6', coral: '#6E2B32', coralSoft: '#F2DEDC',
+  success: '#15803D', error: '#B91C1C', errorSoft: '#F2DEDC',
 } as const;
 
-export const CARD_SHADOW: ViewStyle = {
-  shadowColor: '#082131',
-  shadowOffset: { width: 0, height: 8 },
-  shadowOpacity: 0.08,
-  shadowRadius: 20,
-  elevation: 3,
+export const CARD_SHADOW: ViewStyle = {};
+export const SOFT_SHADOW: ViewStyle = {};
+export const RADII = { small: 0, medium: 2, large: 2, pill: 2 } as const;
+export const TYPE: Record<'display' | 'body' | 'mono', TextStyle> = {
+  display: { fontFamily: FONTS.display }, body: { fontFamily: FONTS.body }, mono: { fontFamily: FONTS.mono },
 };
-
-export const SOFT_SHADOW: ViewStyle = {
-  shadowColor: '#082131',
-  shadowOffset: { width: 0, height: 4 },
-  shadowOpacity: 0.06,
-  shadowRadius: 12,
-  elevation: 2,
-};
-
-export const RADII = {
-  small: 10,
-  medium: 16,
-  large: 22,
-  pill: 999,
-} as const;

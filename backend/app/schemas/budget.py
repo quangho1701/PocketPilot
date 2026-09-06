@@ -5,6 +5,9 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
+BudgetingMode = Literal["50_30_20", "zero_based", "custom", "ai_personalized"]
+BudgetStatus = Literal["draft", "active", "archived"]
+
 
 class BudgetAllocationCreate(BaseModel):
     category_slug: Optional[str] = Field(default=None, min_length=1, max_length=80)
@@ -47,8 +50,8 @@ class BudgetCreate(BaseModel):
     year: int = Field(ge=2000)
     total_income: float = Field(ge=0)
     planned_savings: float = Field(ge=0)
-    status: str = Field(default="draft", max_length=20)
-    budgeting_mode: str = Field(default="50_30_20", max_length=30)
+    status: Literal["draft"] = "draft"
+    budgeting_mode: BudgetingMode = "50_30_20"
     strategy_source: str = Field(default="deterministic", max_length=30)
     allocations: list[BudgetAllocationCreate] = Field(default_factory=list)
 
@@ -60,8 +63,8 @@ class BudgetResponse(BaseModel):
     year: int
     total_income: float
     planned_savings: float
-    status: str
-    budgeting_mode: str
+    status: BudgetStatus
+    budgeting_mode: BudgetingMode
     strategy_source: str
     approved_at: Optional[datetime]
     allocations: list[BudgetAllocationResponse]
@@ -96,7 +99,7 @@ class BudgetProposalPayload(BaseModel):
 class BudgetGenerationRequest(BaseModel):
     month: int = Field(ge=1, le=12)
     year: int = Field(ge=2000)
-    budgeting_mode: str = Field(default="50_30_20")
+    budgeting_mode: BudgetingMode = "50_30_20"
     user_id: Optional[str] = None
     custom_allocations: list[BudgetAllocationUpdate] = Field(default_factory=list)
 
@@ -113,7 +116,7 @@ class BudgetAdjustmentRequest(BaseModel):
 class BudgetProposalGenerateRequest(BaseModel):
     month: int = Field(ge=1, le=12)
     year: int = Field(ge=2000)
-    budgeting_mode: Literal["50_30_20", "zero_based", "custom", "ai_personalized"]
+    budgeting_mode: BudgetingMode
     custom_allocations: list[BudgetAllocationUpdate] = Field(default_factory=list)
 
 

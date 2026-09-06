@@ -1,7 +1,8 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { ChatMessage } from '@/types';
-import { COLORS, SOFT_SHADOW } from '@/theme';
+import { COLORS, FONTS } from '@/theme';
+import GoalSimulationCard from './GoalSimulationCard';
 import RecommendationCard from './RecommendationCard';
 
 interface Props {
@@ -44,6 +45,9 @@ export default function MessageBubble({
           <Text style={isUser ? styles.textUser : styles.textAssistant}>
             {message.content}
           </Text>
+          {!isUser && message.simulation_result ? (
+            <GoalSimulationCard result={message.simulation_result} />
+          ) : null}
           {!isUser && message.recommendation ? (
             <RecommendationCard
               message={message}
@@ -71,43 +75,42 @@ const styles = StyleSheet.create({
   rowUser: { justifyContent: 'flex-end' },
   rowAssistant: { justifyContent: 'flex-start' },
   avatar: {
-    width: 29,
-    height: 29,
+    width: 30,
+    height: 30,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 15,
-    backgroundColor: COLORS.mint,
+    borderRadius: 0,
+    backgroundColor: COLORS.parchmentDeep,
     marginRight: 7,
     marginTop: 18,
     borderWidth: 1,
-    borderColor: '#CDEBE2',
+    borderColor: COLORS.greenDeep,
   },
   messageColumn: { maxWidth: '88%' },
   senderName: {
-    color: COLORS.textSecondary,
-    fontSize: 9.5,
-    fontWeight: '800',
+    color: COLORS.oxblood,
+    fontFamily: FONTS.mono,
+    fontSize: 9,
     marginBottom: 4,
     marginLeft: 3,
   },
   bubble: {
-    borderRadius: 18,
-    paddingHorizontal: 14,
+    borderRadius: 2,
+    paddingHorizontal: 13,
     paddingVertical: 11,
   },
   bubbleUser: {
-    backgroundColor: COLORS.teal,
-    borderBottomRightRadius: 5,
+    backgroundColor: COLORS.greenDeep,
+    borderBottomRightRadius: 0,
   },
   bubbleAssistant: {
-    backgroundColor: COLORS.surface,
-    borderTopLeftRadius: 5,
+    backgroundColor: COLORS.parchmentDeep,
+    borderTopLeftRadius: 0,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    ...SOFT_SHADOW,
+    borderColor: COLORS.borderStrong,
   },
-  textUser: { color: COLORS.surface, fontSize: 14, lineHeight: 20 },
+  textUser: { color: COLORS.parchment, fontSize: 14, lineHeight: 20 },
   textAssistant: { color: COLORS.text, fontSize: 14, lineHeight: 21 },
-  time: { color: COLORS.textMuted, fontSize: 9, marginTop: 4, marginLeft: 3 },
+  time: { color: COLORS.textMuted, fontFamily: FONTS.mono, fontSize: 8, marginTop: 4, marginLeft: 3 },
   timeUser: { textAlign: 'right', marginLeft: 0, marginRight: 3 },
 });

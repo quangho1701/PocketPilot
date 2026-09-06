@@ -9,6 +9,7 @@ from alembic import context
 
 # Import all models so Alembic can detect them
 from app.models import Base  # noqa: F401
+from app.config import settings
 
 config = context.config
 
@@ -20,7 +21,7 @@ target_metadata = Base.metadata
 
 def _get_url() -> str:
     """Return DB URL with sslmode stripped (asyncpg uses connect_args instead)."""
-    url = config.get_main_option("sqlalchemy.url", "")
+    url = settings.database_url or config.get_main_option("sqlalchemy.url", "")
     url = url.replace("?sslmode=disable", "").replace("&sslmode=disable", "")
     return url
 
@@ -46,11 +47,15 @@ def do_run_migrations(connection: Connection) -> None:
 async def run_async_migrations() -> None:
     section = dict(config.get_section(config.config_ini_section, {}))
     section["sqlalchemy.url"] = _get_url()
+    url = section["sqlalchemy.url"]
+    engine_options = {}
+    if url.startswith("cockroachdb+"):
+        engine_options = {"connect_args": {"ssl": False}, "isolation_level": "SERIALIZABLE"}
     connectable = async_engine_from_config(
         section,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
-        connect_args={"ssl": False},
+        **engine_options,
     )
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)

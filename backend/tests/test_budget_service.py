@@ -1,14 +1,21 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
+from unittest.mock import AsyncMock, patch
 
 import pytest
+from httpx import ASGITransport, AsyncClient
+from pydantic import ValidationError
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.models import Base, Budget, BudgetAllocation, BudgetCategory, FinancialMemory, MemoryType, User, UserProfile
-from app.schemas.budget import BudgetAllocationUpdate
+from app.main import app
+from app.schemas.budget import BudgetAllocationUpdate, BudgetGenerationRequest
+from app.schemas.transaction import TransactionCreate
 from app.services.budget_service import BudgetService
+from app.services.transaction_service import TransactionService
 
 
 async def _new_session():
@@ -104,6 +111,144 @@ async def test_generate_and_approve_budget_lifecycle():
         )
         assert archived_count >= 1
     finally:
+        await session.close()
+        await engine.dispose()
+
+
+def test_invalid_budgeting_mode_is_rejected_by_request_schema():
+    with pytest.raises(ValidationError):
+        BudgetGenerationRequest(month=9, year=2026, budgeting_mode="bogus")
+
+
+@pytest.mark.asyncio
+async def test_invalid_budgeting_mode_endpoint_returns_422():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/api/v1/budget/proposals/generate",
+            params={"user_id": "user-1"},
+            json={"month": 9, "year": 2026, "budgeting_mode": "bogus"},
+        )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_only_draft_budget_can_be_approved():
+    session, engine = await _new_session()
+    try:
+        await _seed_user(session)
+        service = BudgetService(session)
+        draft = await service.generate_budget_proposal("user-1", 9, 2026, "50_30_20")
+        active = await service.approve_budget("user-1", draft["id"])
+        with pytest.raises(ValueError, match="only draft budgets can be approved"):
+            await service.approve_budget("user-1", active["id"])
+        replacement = await service.generate_budget_proposal("user-1", 9, 2026, "zero_based")
+        await service.approve_budget("user-1", replacement["id"])
+        with pytest.raises(ValueError, match="only draft budgets can be approved"):
+            await service.approve_budget("user-1", active["id"])
+    finally:
+        await session.close()
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("budget_status", ["draft", "archived"])
+async def test_progress_requires_active_budget(budget_status):
+    session, engine = await _new_session()
+    try:
+        await _seed_user(session)
+        session.add(Budget(user_id="user-1", month=9, year=2026, total_income=5000, planned_savings=1000, status=budget_status))
+        await session.flush()
+        with pytest.raises(ValueError, match="active budget not found"):
+            await BudgetService(session).get_budget_progress("user-1", 9, 2026)
+    finally:
+        await session.close()
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_allocation_edit_recalculates_planned_savings_on_backend():
+    session, engine = await _new_session()
+    try:
+        await _seed_user(session)
+        service = BudgetService(session)
+        draft = await service.generate_budget_proposal("user-1", 9, 2026, "50_30_20")
+        allocations = [{"category_id": item["category_id"], "amount": item["allocated_amount"]} for item in draft["allocations"]]
+        allocations[0]["amount"] -= 250
+        updated = await service.update_draft_budget("user-1", draft["id"], {"allocations": allocations})
+        assert updated["planned_savings"] == pytest.approx(draft["planned_savings"] + 250)
+        assert _sum_allocations(updated) + updated["planned_savings"] == pytest.approx(updated["total_income"])
+    finally:
+        await session.close()
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_ai_failure_records_deterministic_fallback_provenance():
+    session, engine = await _new_session()
+    try:
+        await _seed_user(session)
+        with patch("app.services.budget_service.bedrock_client.invoke_with_prompt", new_callable=AsyncMock, side_effect=RuntimeError("offline")):
+            draft = await BudgetService(session).generate_budget_proposal("user-1", 9, 2026, "ai_personalized")
+        assert draft["budgeting_mode"] == "ai_personalized"
+        assert draft["strategy_source"] == "deterministic_fallback"
+    finally:
+        await session.close()
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_custom_budget_can_be_authored_without_existing_budget():
+    session, engine = await _new_session()
+    try:
+        await _seed_user(session)
+        draft = await BudgetService(session).generate_budget_proposal(
+            "user-1", 9, 2026, "custom",
+            custom_allocations=[{"category_slug": "housing", "amount": 3200}],
+        )
+        assert draft["planned_savings"] == pytest.approx(1800)
+        assert _sum_allocations(draft) == pytest.approx(3200)
+    finally:
+        await session.close()
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_created_transaction_updates_active_budget_progress():
+    session, engine = await _new_session()
+    try:
+        await _seed_user(session)
+        service = BudgetService(session)
+        active = await service.create_budget("user-1", {
+            "month": 9, "year": 2026, "total_income": 5000, "planned_savings": 1000,
+            "status": "active", "allocations": [{"category_slug": "housing", "allocated_amount": 4000}],
+        })
+        await TransactionService(session).create_transaction("user-1", TransactionCreate(
+            amount=750, category="housing", description="Tiền thuê nhà", date=date(2026, 9, 5)
+        ))
+        progress = await service.get_budget_progress("user-1", 9, 2026)
+        assert progress["budget"]["id"] == active["id"]
+        assert progress["total_spent"] == 750
+        assert progress["categories"][0]["remaining_amount"] == 3250
+    finally:
+        await session.close()
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_partial_unique_index_rejects_two_active_budgets():
+    session, engine = await _new_session()
+    try:
+        await _seed_user(session)
+        session.add_all([
+            Budget(user_id="user-1", month=9, year=2026, total_income=1, planned_savings=1, status="active"),
+            Budget(user_id="user-1", month=9, year=2026, total_income=1, planned_savings=1, status="active"),
+        ])
+        with pytest.raises(IntegrityError):
+            await session.flush()
+    finally:
+        await session.rollback()
         await session.close()
         await engine.dispose()
 

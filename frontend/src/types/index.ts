@@ -1,3 +1,5 @@
+import type { GoalSimulationResult } from './goalSimulation';
+
 export interface User {
   id: string;
   email: string;
@@ -12,15 +14,6 @@ export interface Transaction {
   category: string;
   description: string;
   date: string;
-}
-
-export interface Budget {
-  id: string;
-  user_id: string;
-  category: string;
-  limit: number;
-  spent: number;
-  period: 'weekly' | 'monthly';
 }
 
 export interface Goal {
@@ -42,6 +35,9 @@ export interface ChatMessage {
   amount?: number | null;
   category?: string | null;
   decision_id?: string | null;
+  simulation_input?: Record<string, unknown> | null;
+  simulation_result?: GoalSimulationResult | null;
+  simulation_schema_version?: number | null;
   created_at: string;
 }
 
@@ -63,3 +59,5 @@ export interface ApiResponse<T> {
 }
 
 export * from './setup';
+export * from './goalSimulation';
+export * from './budget';

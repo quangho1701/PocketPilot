@@ -205,7 +205,7 @@ class TestService:
             )
             assert result.goal.id == saved_goal.id
             assert result.baseline.monthly_contribution == 600
-            assert any(budget.id in assumption for assumption in result.assumptions)
+            assert any("ngân sách đang hoạt động" in assumption for assumption in result.assumptions)
         finally:
             await session.close()
             await engine.dispose()
@@ -305,6 +305,27 @@ class TestIntent:
             await engine.dispose()
 
     @pytest.mark.asyncio
+    async def test_resolves_vietnamese_expense_and_savings_prompts(self):
+        session, engine = await new_session()
+        try:
+            await seed_goal(session)
+            resolver = GoalSimulationIntentResolver(session)
+            expense = await resolver.resolve(
+                "user-1", "Nếu mình chi thêm 500.000 ₫ thì mục tiêu thay đổi thế nào?"
+            )
+            savings = await resolver.resolve(
+                "user-1", "Nếu mình để dành thêm 200.000 ₫ mỗi tháng thì mục tiêu thay đổi thế nào?"
+            )
+            assert expense is not None and expense.is_simulation
+            assert expense.scenario.scenario_type == ScenarioType.ONE_TIME_EXPENSE
+            assert expense.scenario.amount == 500_000
+            assert savings is not None and savings.is_simulation
+            assert savings.scenario.scenario_type == ScenarioType.ADDITIONAL_SAVINGS
+        finally:
+            await session.close()
+            await engine.dispose()
+
+    @pytest.mark.asyncio
     async def test_intent_clarifies_ambiguous_goal_and_month_deadline(self):
         session, engine = await new_session()
         try:
@@ -313,7 +334,7 @@ class TestIntent:
             resolver = GoalSimulationIntentResolver(session)
             ambiguous = await resolver.resolve("user-1", "What if I spend 300?")
             deadline = await resolver.resolve("user-1", "Will I reach my goal by June if I spend 300?")
-            assert ambiguous is not None and ambiguous.clarification == "Which goal would you like me to simulate?"
+            assert ambiguous is not None and ambiguous.clarification == "Bạn muốn mô phỏng mục tiêu nào?"
             assert deadline is not None and deadline.clarification is not None
         finally:
             await session.close()
@@ -356,8 +377,88 @@ class TestChat:
             await seed_goal(session, name="Laptop", target_amount=1500, current_amount=400)
             with patch("app.services.assistant_service.llm_client.invoke_model", new_callable=AsyncMock) as invoke_model:
                 clarification = await AssistantService(session).chat("user-1", ChatRequest(message="What if I spend 300?"))
-            assert clarification.message.content == "Which goal would you like me to simulate?"
+            assert clarification.message.content == "Bạn muốn mô phỏng mục tiêu nào?"
             invoke_model.assert_not_awaited()
+        finally:
+            await session.close()
+            await engine.dispose()
+
+
+class TestCompletionRegressions:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "message",
+        [
+            "Should I buy these headphones for 1200000?",
+            "Mình có nên mua tai nghe 1,2 triệu không?",
+            "Mua cái này bây giờ có hợp lý không?",
+        ],
+    )
+    async def test_purchase_recommendation_prompts_are_not_simulations(self, message):
+        session, engine = await new_session()
+        try:
+            await seed_goal(session)
+            assert await GoalSimulationIntentResolver(session).resolve("user-1", message) is None
+        finally:
+            await session.close()
+            await engine.dispose()
+
+    @pytest.mark.parametrize(
+        ("text", "expected"),
+        [
+            ("Nếu chi 500k thì mục tiêu thay đổi thế nào?", 500_000),
+            ("If I spend 1.2m, how will it affect my goal?", 1_200_000),
+            ("Nếu chi 500 nghìn thì mục tiêu thay đổi thế nào?", 500_000),
+            ("Nếu chi 1 triệu thì mục tiêu thay đổi thế nào?", 1_000_000),
+            ("Nếu chi 1,5 triệu thì mục tiêu thay đổi thế nào?", 1_500_000),
+            ("Nếu chi 1.200.000 ₫ thì mục tiêu thay đổi thế nào?", 1_200_000),
+        ],
+    )
+    def test_parses_localized_amount_formats(self, text, expected):
+        scenario, _, clarification = GoalSimulationIntentResolver(None)._parse_scenario(text)
+        assert clarification is None
+        assert scenario is not None and scenario.amount == expected
+
+    @pytest.mark.asyncio
+    async def test_completed_goal_is_rejected_consistently(self):
+        session, engine = await new_session()
+        try:
+            completed = await seed_goal(session, status="completed")
+            await seed_budget(session)
+            with pytest.raises(ValueError, match="goal is not active"):
+                await GoalSimulationService(session).simulate(
+                    "user-1", one_time_request(completed.id), as_of_date=AS_OF_DATE
+                )
+            intent = await GoalSimulationIntentResolver(session).resolve(
+                "user-1", "Nếu chi 500 nghìn thì mục tiêu thay đổi thế nào?"
+            )
+            assert intent is not None
+            assert intent.clarification == "Chưa có mục tiêu tài chính đang hoạt động để mô phỏng."
+        finally:
+            await session.close()
+            await engine.dispose()
+
+    @pytest.mark.asyncio
+    async def test_simulation_persists_when_explanation_llm_fails(self):
+        session, engine = await new_session()
+        try:
+            await seed_goal(session)
+            await seed_budget(session)
+            with patch(
+                "app.services.assistant_service.llm_client.invoke_model",
+                new_callable=AsyncMock,
+                side_effect=RuntimeError("provider unavailable"),
+            ):
+                response = await AssistantService(session).chat(
+                    "user-1", ChatRequest(message="Nếu chi 500 nghìn thì mục tiêu thay đổi thế nào?")
+                )
+            assert response.message.simulation_result is not None
+            assert response.message.content.startswith("Mình đã tính tác động")
+            await session.commit()
+            messages = await AssistantService(session).get_messages("user-1", response.conversation_id)
+            assert messages is not None
+            persisted = next(message for message in messages if message.role == "assistant")
+            assert persisted.simulation_result == response.message.simulation_result.model_dump(mode="json")
         finally:
             await session.close()
             await engine.dispose()

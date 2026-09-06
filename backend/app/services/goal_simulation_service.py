@@ -42,8 +42,8 @@ class GoalSimulationService:
         )
         result.assumptions.extend(
             [
-                f"Uses active budget {budget.id} planned savings for {projection_date:%Y-%m}.",
-                f"Selected goal is saved goal progress from memory {goal_memory.id}.",
+                f"Dùng khoản tiết kiệm dự kiến từ ngân sách đang hoạt động của tháng {projection_date:%m/%Y}.",
+                "Dùng tiến độ hiện tại của mục tiêu đã lưu.",
             ]
         )
         return result
@@ -62,7 +62,7 @@ class GoalSimulationService:
             raise ValueError("active goal not found")
 
         status = str((goal.details or {}).get("status", "active")).lower()
-        if status not in {"active", "completed"}:
+        if status != "active":
             raise ValueError("goal is not active")
         return goal
 

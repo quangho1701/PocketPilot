@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Float, ForeignKey, Index, Integer, String
+from sqlalchemy import DateTime, Float, ForeignKey, Index, Integer, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
@@ -36,4 +36,13 @@ class Budget(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __table_args__ = (
         Index("idx_budgets_user_year_month", "user_id", "year", "month"),
         Index("idx_budgets_user_status", "user_id", "status"),
+        Index(
+            "uq_budgets_active_user_year_month",
+            "user_id",
+            "year",
+            "month",
+            unique=True,
+            postgresql_where=text("status = 'active'"),
+            sqlite_where=text("status = 'active'"),
+        ),
     )

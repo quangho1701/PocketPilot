@@ -215,11 +215,11 @@ def simulate_goal(
 
     warnings: list[str] = []
     if unfunded:
-        warnings.append("The one-time expense exceeds this month's planned savings.")
+        warnings.append("Khoản chi một lần vượt quá phần tiết kiệm dự kiến của tháng này.")
     if scenario.scenario_type == ScenarioType.ADDITIONAL_SAVINGS and scenario.amount:
-        warnings.append("Additional savings require an equivalent reduction in planned spending.")
+        warnings.append("Khoản tiết kiệm thêm cần đi kèm mức giảm chi tiêu tương ứng.")
     if scenario.scenario_type == ScenarioType.RECURRING_EXPENSE and monthly_equivalent:
-        warnings.append("Weekly expenses are converted to a monthly equivalent using 52 weeks per year.")
+        warnings.append("Chi phí hàng tuần được quy đổi theo 52 tuần mỗi năm.")
 
     return GoalSimulationResult(
         status=scenario_projection.status,
@@ -228,7 +228,7 @@ def simulate_goal(
         scenario=scenario_outcome,
         impact=impact,
         target_date_assessment=target_date_assessment,
-        assumptions=["Planned savings are contributed at the end of each month."],
+        assumptions=["Khoản tiết kiệm dự kiến được cộng vào cuối mỗi tháng."],
         warnings=warnings,
         trajectory=scenario_trajectory or baseline_trajectory,
     )

@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from collections import defaultdict
 from datetime import UTC, date, datetime
 
-from sqlalchemy import and_, extract, func, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.budget import Budget
@@ -22,6 +23,8 @@ from app.services.budget_strategies import (
     ZeroBasedStrategy,
 )
 from app.utils.bedrock import bedrock_client
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_CATEGORIES = [
     ("housing", "Housing", "needs"),
@@ -328,6 +331,9 @@ class BudgetService:
             budget.budgeting_mode = str(data.get("budgeting_mode", budget.budgeting_mode))
             budget.strategy_source = str(data.get("strategy_source", budget.strategy_source))
         else:
+            if status == "active":
+                await self._archive_active_budget(user_id, month, year)
+                await self.db.flush()
             budget = Budget(
                 user_id=user_id,
                 month=month,
@@ -402,9 +408,10 @@ class BudgetService:
             if parsed:
                 parsed["user_id"] = user_id
                 parsed = await self._enforce_mode_constraints(parsed, selected_mode, context)
+                parsed["_strategy_source"] = "ai_personalized"
                 return parsed
         except Exception:
-            pass
+            logger.exception("AI personalized budget generation failed for user %s", user_id)
 
         fallback_mode = selected_mode
         if fallback_mode == "ai_personalized":
@@ -415,6 +422,7 @@ class BudgetService:
         fallback = await self.generate_proposal(user_id, fallback_mode, context)
         fallback["reasoning"] = "AI unavailable; used deterministic fallback for selected budgeting style."
         fallback["confidence"] = 0.4
+        fallback["_strategy_source"] = "deterministic_fallback"
         return fallback
 
     async def build_budget_context(
@@ -651,6 +659,8 @@ class BudgetService:
         *,
         custom_allocations: list[dict] | None = None,
     ) -> dict:
+        if budgeting_mode == "custom" and not custom_allocations:
+            raise ValueError("custom budgeting requires at least one allocation")
         context = await self.build_budget_context(
             user_id,
             month,
@@ -666,7 +676,7 @@ class BudgetService:
                 selected_mode=budgeting_mode,
                 initial_only=context.get("history_months", 0) < 3,
             )
-            source = "ai_personalized"
+            source = str(proposal.pop("_strategy_source", "ai_personalized"))
         else:
             proposal = await self.generate_proposal(user_id, budgeting_mode, context)
             source = "deterministic"
@@ -704,12 +714,11 @@ class BudgetService:
         if budget.status != "draft":
             raise ValueError("only draft budgets can be edited")
 
-        if "planned_savings" in payload and payload["planned_savings"] is not None:
-            budget.planned_savings = float(payload["planned_savings"])
-
         allocations = payload.get("allocations")
         if allocations is not None:
             normalized = await self._resolve_allocations(user_id, allocations)
+            allocation_total = sum(float(item["allocated_amount"]) for item in normalized)
+            budget.planned_savings = round(float(budget.total_income) - allocation_total, 2)
             existing_allocations = await self.db.execute(
                 select(BudgetAllocation).where(BudgetAllocation.budget_id == budget.id)
             )
@@ -723,6 +732,9 @@ class BudgetService:
                         allocated_amount=allocation["allocated_amount"],
                     )
                 )
+
+        elif "planned_savings" in payload and payload["planned_savings"] is not None:
+            budget.planned_savings = float(payload["planned_savings"])
 
         allocation_rows = await self.db.execute(
             select(BudgetAllocation).where(BudgetAllocation.budget_id == budget.id)
@@ -751,6 +763,8 @@ class BudgetService:
         )
         if not budget:
             raise ValueError("budget not found")
+        if budget.status != "draft":
+            raise ValueError("only draft budgets can be approved")
 
         allocation_rows = await self.db.execute(
             select(BudgetAllocation).where(BudgetAllocation.budget_id == budget.id)
@@ -771,6 +785,9 @@ class BudgetService:
             raise ValueError("; ".join(errors))
 
         await self._archive_active_budget(user_id, budget.month, budget.year)
+        # Flush archival before activating the replacement so the partial unique
+        # index is never transiently violated.
+        await self.db.flush()
         budget.status = "active"
         budget.approved_at = datetime.now(UTC)
         await self.db.flush()
@@ -805,21 +822,26 @@ class BudgetService:
     async def get_budget_progress(self, user_id: str, month: int, year: int) -> dict:
         budget_data = await self.get_budget_for_month(user_id, month, year, status="active")
         if not budget_data:
-            fallback = await self.get_budget_for_month(user_id, month, year)
-            if not fallback:
-                raise ValueError("budget not found")
-            budget_data = fallback
+            raise ValueError("active budget not found")
 
         memory_rows = await self.db.execute(
             select(FinancialMemory).where(
                 FinancialMemory.user_id == user_id,
                 FinancialMemory.memory_type == MemoryType.TRANSACTION,
                 FinancialMemory.is_deleted == False,  # noqa: E712
-                extract("month", FinancialMemory.created_at) == month,
-                extract("year", FinancialMemory.created_at) == year,
             )
         )
-        txns = list(memory_rows.scalars().all())
+        txns = []
+        for transaction in memory_rows.scalars().all():
+            transaction_date = transaction.created_at.date()
+            raw_date = (transaction.details or {}).get("date")
+            if raw_date:
+                try:
+                    transaction_date = date.fromisoformat(str(raw_date))
+                except ValueError:
+                    pass
+            if transaction_date.month == month and transaction_date.year == year:
+                txns.append(transaction)
 
         spent_by_category: dict[str, float] = defaultdict(float)
         for txn in txns:
