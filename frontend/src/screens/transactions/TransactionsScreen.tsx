@@ -320,14 +320,14 @@ export default function TransactionsScreen({ navigation, route }: Props) {
           <QuickAction
             icon="scan-outline"
             title="Quét hóa đơn"
-            description="Chưa kết nối OCR"
-            onPress={() => setFeatureNotice(OCR_NOTICE)}
+            description="Mở luồng OCR"
+            onPress={() => rootNavigation?.navigate('TransactionLedger', { mode: 'scan' })}
           />
           <QuickAction
             icon="add-outline"
             title="Thêm giao dịch"
-            description="API đang hoàn thiện"
-            onPress={() => setFeatureNotice(ADD_TRANSACTION_NOTICE)}
+            description="Ghi vào sổ chi tiêu"
+            onPress={() => rootNavigation?.navigate('TransactionLedger', { mode: 'create' })}
           />
         </View>
 

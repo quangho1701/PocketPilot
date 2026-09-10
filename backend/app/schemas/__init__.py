@@ -49,7 +49,6 @@ from app.schemas.budget import (
     BudgetAllocationResponse,
     BudgetCreate,
     BudgetResponse,
-    BudgetSimulationRequest,
 )
 from app.schemas.transaction import (
     DashboardCategorySummary,
@@ -101,7 +100,6 @@ __all__ = [
     "BudgetAllocationResponse",
     "BudgetCreate",
     "BudgetResponse",
-    "BudgetSimulationRequest",
     "TransactionCreate",
     "DashboardCategorySummary",
     "DashboardResponse",

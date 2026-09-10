@@ -132,6 +132,7 @@ async def test_transaction_filters_and_pagination():
                 merchant="Grab",
                 transaction_date=date(2026, 8, 12),
                 source=TransactionSource.OCR,
+                payment_method="card",
             ),
         )
         await service.create_transaction(
@@ -158,6 +159,12 @@ async def test_transaction_filters_and_pagination():
         assert filtered.total == 1
         assert filtered.total_pages == 1
         assert filtered.items[0].merchant == "Circle K"
+
+        card_transactions = await service.list_transactions(
+            "user-1", TransactionFilter(payment_method="card")
+        )
+        assert card_transactions.total == 1
+        assert card_transactions.items[0].merchant == "Grab"
     finally:
         await session.close()
         await engine.dispose()
@@ -212,9 +219,13 @@ async def test_dashboard_aggregates_income_expense_and_categories():
             "user-1",
             _transaction_data(
                 food.id,
-                amount=Decimal("125.50"),
-                merchant="Circle K",
-                transaction_date=date(2026, 8, 10),
+            amount=Decimal("125.50"),
+            merchant="Circle K",
+            transaction_date=date(2026, 8, 10),
+            suggested_category_id=food.id,
+            category_suggestion_source="llm",
+            category_suggestion_confidence=0.91,
+            category_suggestion_accepted=True,
             ),
         )
         await service.create_transaction(
@@ -247,11 +258,19 @@ async def test_dashboard_aggregates_income_expense_and_categories():
         assert dashboard.total_expense == Decimal("175.50")
         assert dashboard.net_balance == Decimal("824.50")
         assert dashboard.transaction_count == 3
+        assert dashboard.category_suggestion_count == 1
+        assert dashboard.category_suggestion_acceptance_rate == 1.0
         assert [item.category_name for item in dashboard.by_category] == [
             "Food",
             "Transport",
         ]
         assert dashboard.by_category[0].total_amount == Decimal("125.50")
+        assert len(dashboard.by_currency) == 1
+        assert dashboard.by_currency[0].currency == "VND"
+        assert dashboard.by_currency[0].total_expense == Decimal("175.50")
+        assert dashboard.spending_trend[0].period == "2026-08"
+        assert dashboard.spending_trend[0].total_expense == Decimal("175.50")
+        assert dashboard.recent_transactions[0].merchant == "Grab"
     finally:
         await session.close()
         await engine.dispose()

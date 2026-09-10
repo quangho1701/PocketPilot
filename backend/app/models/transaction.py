@@ -4,7 +4,7 @@ import enum
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, Date, Enum as SAEnum, ForeignKey, Index, Numeric, String, Text
+from sqlalchemy import Boolean, CheckConstraint, Date, Enum as SAEnum, Float, ForeignKey, Index, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
@@ -42,6 +42,11 @@ class Transaction(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
     payment_method: Mapped[str | None] = mapped_column(String(50), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    receipt_reference: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    suggested_category_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    category_suggestion_source: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    category_suggestion_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    category_suggestion_accepted: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     source: Mapped[TransactionSource] = mapped_column(
         SAEnum(
             TransactionSource,

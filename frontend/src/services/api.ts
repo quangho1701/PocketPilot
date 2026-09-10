@@ -1,6 +1,7 @@
 import axios from 'axios';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
+import type { BudgetProgress } from '@/types';
 
 function defaultApiBaseUrl(): string {
   const hostUri = Constants.expoConfig?.hostUri?.replace(/^\w+:\/\//, '');
@@ -22,6 +23,14 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+export function setAuthToken(token: string | null) {
+  if (token) {
+    api.defaults.headers.common.Authorization = `Bearer ${token}`;
+  } else {
+    delete api.defaults.headers.common.Authorization;
+  }
+}
 
 export const createBudget = async (userId: string, payload: Record<string, unknown>) => {
   const response = await api.post(`/api/v1/budget/?user_id=${encodeURIComponent(userId)}`, payload);
@@ -67,7 +76,7 @@ export const getBudgetProgress = async (userId: string, month: number, year: num
   const response = await api.get('/api/v1/budget/progress', {
     params: { user_id: userId, month, year },
   });
-  return response.data;
+  return response.data as BudgetProgress;
 };
 
 export const listBudgetCategories = async (userId: string) => {

@@ -4,11 +4,12 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import MemoryScreen from '@/screens/memory/MemoryScreen';
 import AssistantScreen from '@/screens/assistant/AssistantScreen';
 import BudgetScreen from '@/screens/budget/BudgetScreen';
 import TransactionsScreen from '@/screens/transactions/TransactionsScreen';
 import FinancialSetupScreen from '@/screens/setup/FinancialSetupScreen';
+import TransactionLedgerScreen from '@/screens/transactions/TransactionLedgerScreen';
+import AnalyticsScreen from '@/screens/transactions/AnalyticsScreen';
 import { getFinancialSetup } from '@/services/setup';
 import { COLORS, SOFT_SHADOW } from '@/theme';
 import type { MainTabParamList, RootStackParamList } from './types';
@@ -43,6 +44,7 @@ function MainTabs() {
             Transactions: { active: 'grid', inactive: 'grid-outline' },
             Assistant: { active: 'sparkles', inactive: 'sparkles-outline' },
             Budget: { active: 'pie-chart', inactive: 'pie-chart-outline' },
+            Analytics: { active: 'analytics', inactive: 'analytics-outline' },
             Memory: { active: 'analytics', inactive: 'analytics-outline' },
           };
           const icon = icons[route.name];
@@ -71,7 +73,7 @@ function MainTabs() {
         options={{ title: 'Cố vấn' }}
       />
       <Tab.Screen name="Budget" component={BudgetScreen} options={{ title: 'Kế hoạch' }} />
-      <Tab.Screen name="Memory" component={MemoryScreen} options={{ title: 'Phân tích' }} />
+      <Tab.Screen name="Analytics" component={AnalyticsScreen} options={{ title: 'Analytics' }} />
     </Tab.Navigator>
   );
 }
@@ -148,6 +150,7 @@ export default function AppNavigator() {
         initialParams={{ mode: 'initial' }}
         options={({ route }) => ({ gestureEnabled: route.params.mode === 'edit' })}
       />
+      <Stack.Screen name="TransactionLedger" component={TransactionLedgerScreen} />
     </Stack.Navigator>
   );
 }

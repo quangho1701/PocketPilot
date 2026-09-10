@@ -3,13 +3,17 @@
 from __future__ import annotations
 
 from datetime import date
+from typing import Literal
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.user import User
 from app.schemas.transaction import (
+    CategorizationRequest,
+    CategoryPrediction,
     DashboardResponse,
     ReceiptOCRResponse,
     TransactionCreate,
@@ -23,6 +27,8 @@ from app.services.receipt_ocr_service import (
     ReceiptOCRProviderError,
     ReceiptOCRService,
 )
+from app.services.receipt_storage_service import ReceiptStorageError, ReceiptStorageService
+from app.services.categorization_service import CategorizationService
 from app.utils.auth import get_current_user
 from app.services.transaction_service import TransactionService
 
@@ -63,14 +69,15 @@ async def create_transaction(
 @router.post("/ocr", response_model=ReceiptOCRResponse)
 async def scan_receipt(
     file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Scan a receipt and return a preview; do not create a transaction yet."""
-    allowed_types = {"image/jpeg", "image/png", "image/webp", "application/pdf"}
+    allowed_types = {"image/jpeg", "image/png", "image/webp"}
     if file.content_type not in allowed_types:
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail="Receipt must be a JPEG, PNG, WEBP, or PDF file",
+            detail="Receipt must be a JPEG, PNG, or WEBP image",
         )
 
     max_size = 10 * 1024 * 1024
@@ -81,21 +88,79 @@ async def scan_receipt(
         raise HTTPException(status_code=413, detail="Receipt file must be 10 MB or smaller")
 
     try:
-        return await ReceiptOCRService().scan(
+        receipt_reference = ReceiptStorageService().store(
+            current_user.id, file_bytes, file.content_type
+        )
+        preview = await ReceiptOCRService().scan(
             file_bytes=file_bytes,
             filename=file.filename or "receipt",
             content_type=file.content_type,
         )
+        preview.receipt_reference = receipt_reference
+        if preview.merchant:
+            try:
+                preview.suggested_category = await CategorizationService(db).categorize(
+                    user_id=current_user.id,
+                    merchant=preview.merchant,
+                    description=preview.raw_text[:2000],
+                    items=preview.items,
+                )
+                await db.commit()
+            except ValueError:
+                # OCR remains useful even if category seed data is unavailable.
+                pass
+        return preview
     except ReceiptOCRNotConfigured as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except ReceiptOCRProviderError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except ReceiptStorageError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.get("/ocr/{receipt_reference}")
+async def get_receipt(
+    receipt_reference: str,
+    current_user: User = Depends(get_current_user),
+):
+    """Return a previously scanned receipt owned by the current user."""
+    try:
+        path = ReceiptStorageService().path_for(current_user.id, receipt_reference)
+    except ReceiptStorageError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Receipt not found")
+
+    media_types = {".jpg": "image/jpeg", ".png": "image/png", ".webp": "image/webp"}
+    return FileResponse(path, media_type=media_types[path.suffix.lower()])
+
+
+@router.post("/categorize", response_model=CategoryPrediction)
+async def categorize_transaction(
+    data: CategorizationRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Suggest a category for review; this endpoint never creates a transaction."""
+    try:
+        prediction = await CategorizationService(db).categorize(
+            user_id=current_user.id,
+            merchant=data.merchant,
+            description=data.description,
+            transaction_type=data.transaction_type,
+            items=data.items,
+        )
+        await db.commit()
+        return prediction
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("/dashboard", response_model=DashboardResponse)
 async def get_dashboard(
     date_from: date | None = None,
     date_to: date | None = None,
+    trend_period: Literal["week", "month"] = "month",
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -103,7 +168,7 @@ async def get_dashboard(
         raise HTTPException(status_code=400, detail="date_from must be before date_to")
 
     return await TransactionService(db).get_dashboard_data(
-        current_user.id, date_from, date_to
+        current_user.id, date_from, date_to, trend_period
     )
 
 
