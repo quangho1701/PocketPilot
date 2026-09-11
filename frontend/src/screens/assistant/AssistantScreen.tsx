@@ -23,7 +23,7 @@ import {
   getMessages,
   recordDecision,
 } from '@/services/assistant';
-import { COLORS, SOFT_SHADOW } from '@/theme';
+import { COLORS, FONTS, SOFT_SHADOW } from '@/theme';
 import MessageBubble from './components/MessageBubble';
 
 const STARTER_PROMPTS = [
@@ -39,8 +39,13 @@ const STARTER_PROMPTS = [
   },
   {
     icon: 'flag-outline' as const,
-    label: 'Khoản nào nên hoãn để giữ mục tiêu?',
-    prompt: 'Khoản mua nào mình nên hoãn để không ảnh hưởng mục tiêu?',
+    label: 'Chi thêm có ảnh hưởng mục tiêu không?',
+    prompt: 'Nếu mình chi thêm 500.000 ₫ thì mục tiêu của mình thay đổi thế nào?',
+  },
+  {
+    icon: 'trending-up-outline' as const,
+    label: 'Nếu để dành thêm mỗi tháng?',
+    prompt: 'Nếu mình để dành thêm 200.000 ₫ mỗi tháng thì mục tiêu thay đổi thế nào?',
   },
 ];
 
@@ -232,8 +237,8 @@ export default function AssistantScreen() {
                 <View style={styles.welcomeBubble}>
                   <Text style={styles.welcomeTitle}>Chào bạn 👋</Text>
                   <Text style={styles.welcomeText}>
-                    Bạn đang cân nhắc mua gì? Gửi mình tên món đồ và giá, mình sẽ giúp bạn
-                    quyết định trước khi chi.
+                    Bạn đang cân nhắc khoản chi hoặc mục tiêu nào? Gửi mình tình huống và số tiền,
+                    mình sẽ giúp bạn xem tác động trước khi quyết định.
                   </Text>
                   <View style={styles.signalList}>
                     {CONTEXT_SIGNALS.map((signal) => (
@@ -335,14 +340,14 @@ export default function AssistantScreen() {
               style={styles.input}
               value={input}
               onChangeText={setInput}
-              placeholder="Nhập món đồ và giá…"
+              placeholder="Hỏi về khoản chi hoặc mục tiêu…"
               placeholderTextColor={COLORS.textMuted}
               selectionColor={COLORS.teal}
               multiline
               maxLength={1000}
               editable={!thinking && !loadingHistory}
-              accessibilityLabel="Câu hỏi cho cố vấn chi tiêu"
-              accessibilityHint="Ví dụ: Tai nghe 1 triệu 2, có nên mua hôm nay không?"
+              accessibilityLabel="Câu hỏi cho cố vấn tài chính"
+              accessibilityHint="Ví dụ: Chi thêm 500 nghìn ảnh hưởng mục tiêu thế nào?"
             />
             <Pressable
               style={({ pressed }) => [
@@ -378,29 +383,29 @@ export default function AssistantScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: COLORS.surface },
-  container: { flex: 1, backgroundColor: COLORS.background },
+  safeArea: { flex: 1, backgroundColor: COLORS.parchment },
+  container: { flex: 1, backgroundColor: COLORS.parchment },
   header: {
     minHeight: 68,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    backgroundColor: COLORS.surface,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: COLORS.border,
+    backgroundColor: COLORS.parchment,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.borderStrong,
   },
   assistantAvatar: {
     width: 40,
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 20,
-    backgroundColor: COLORS.mint,
+    borderRadius: 0,
+    backgroundColor: COLORS.parchmentDeep,
     borderWidth: 1,
-    borderColor: '#CDEBE2',
+    borderColor: COLORS.greenDeep,
   },
   headerCopy: { flex: 1, marginLeft: 11 },
-  headerTitle: { color: COLORS.text, fontSize: 16, fontWeight: '900' },
+  headerTitle: { color: COLORS.text, fontFamily: FONTS.display, fontSize: 23 },
   statusRow: { flexDirection: 'row', alignItems: 'center', marginTop: 3 },
   statusDot: {
     width: 6,
@@ -416,8 +421,8 @@ const styles = StyleSheet.create({
     height: 38,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 19,
-    backgroundColor: COLORS.surfaceMuted,
+    borderRadius: 0,
+    backgroundColor: COLORS.parchmentDeep,
     borderWidth: 1,
     borderColor: COLORS.border,
   },
@@ -442,9 +447,8 @@ const styles = StyleSheet.create({
     minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 18,
-    borderTopLeftRadius: 6,
-    backgroundColor: COLORS.surface,
+    borderRadius: 0,
+    backgroundColor: COLORS.parchmentDeep,
     borderWidth: 1,
     borderColor: COLORS.border,
     paddingHorizontal: 14,
@@ -477,8 +481,8 @@ const styles = StyleSheet.create({
     height: 34,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 17,
-    backgroundColor: COLORS.mint,
+    borderRadius: 0,
+    backgroundColor: COLORS.parchmentDeep,
     borderWidth: 1,
     borderColor: '#CDEBE2',
     marginTop: 18,
@@ -493,15 +497,14 @@ const styles = StyleSheet.create({
   senderName: { color: COLORS.textSecondary, fontSize: 10, fontWeight: '800' },
   senderTime: { color: COLORS.textMuted, fontSize: 9, marginLeft: 7 },
   welcomeBubble: {
-    borderRadius: 20,
-    borderTopLeftRadius: 6,
-    backgroundColor: COLORS.surface,
+    borderRadius: 0,
+    backgroundColor: COLORS.parchmentDeep,
     borderWidth: 1,
     borderColor: COLORS.border,
     padding: 15,
     ...SOFT_SHADOW,
   },
-  welcomeTitle: { color: COLORS.text, fontSize: 15, fontWeight: '900', marginBottom: 6 },
+  welcomeTitle: { color: COLORS.text, fontFamily: FONTS.display, fontSize: 21, marginBottom: 6 },
   welcomeText: { color: COLORS.textSecondary, fontSize: 13, lineHeight: 19 },
   signalList: {
     flexDirection: 'row',
@@ -514,16 +517,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 15,
-    backgroundColor: COLORS.mintSoft,
+    borderRadius: 0,
+    borderWidth: 1,
+    borderColor: COLORS.greenDeep,
+    backgroundColor: COLORS.parchment,
     paddingHorizontal: 9,
   },
   signalText: { color: COLORS.tealDark, fontSize: 9.5, fontWeight: '700', marginLeft: 4 },
   memoryNote: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 13,
-    backgroundColor: COLORS.mintSoft,
+    borderRadius: 0,
+    borderWidth: 1,
+    borderColor: COLORS.greenDeep,
+    backgroundColor: COLORS.parchmentDeep,
     paddingHorizontal: 11,
     paddingVertical: 9,
     marginTop: 8,
@@ -550,10 +557,10 @@ const styles = StyleSheet.create({
     minHeight: 45,
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 18,
+    borderRadius: 0,
     borderWidth: 1,
     borderColor: COLORS.borderStrong,
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.parchment,
     paddingHorizontal: 9,
   },
   quickReplyPressed: { borderColor: COLORS.teal, backgroundColor: COLORS.mintSoft },
@@ -562,8 +569,8 @@ const styles = StyleSheet.create({
     height: 29,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 15,
-    backgroundColor: COLORS.mintSoft,
+    borderRadius: 0,
+    backgroundColor: COLORS.parchmentDeep,
   },
   quickReplyText: { flex: 1, color: COLORS.text, fontSize: 11.5, fontWeight: '700', marginHorizontal: 9 },
   messageList: { paddingVertical: 14 },
@@ -571,9 +578,8 @@ const styles = StyleSheet.create({
   thinkingBubble: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 16,
-    borderBottomLeftRadius: 5,
-    backgroundColor: COLORS.surface,
+    borderRadius: 0,
+    backgroundColor: COLORS.parchmentDeep,
     paddingHorizontal: 13,
     paddingVertical: 10,
     ...SOFT_SHADOW,
@@ -596,9 +602,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
   composerShell: {
-    backgroundColor: COLORS.surface,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: COLORS.border,
+    backgroundColor: COLORS.parchment,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.borderStrong,
     paddingHorizontal: 12,
     paddingTop: 8,
     paddingBottom: 6,
@@ -609,8 +615,8 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     borderWidth: 1,
     borderColor: COLORS.borderStrong,
-    borderRadius: 27,
-    backgroundColor: COLORS.surface,
+    borderRadius: 0,
+    backgroundColor: COLORS.parchmentDeep,
     paddingLeft: 16,
     paddingRight: 6,
     paddingVertical: 5,
@@ -631,8 +637,8 @@ const styles = StyleSheet.create({
     height: 42,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 21,
-    backgroundColor: COLORS.teal,
+    borderRadius: 0,
+    backgroundColor: COLORS.greenDeep,
   },
   sendPressed: { backgroundColor: COLORS.tealDark },
   sendDisabled: { backgroundColor: COLORS.borderStrong },

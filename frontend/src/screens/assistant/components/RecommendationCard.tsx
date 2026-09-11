@@ -1,39 +1,33 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { ChatMessage } from '@/types';
-import { COLORS } from '@/theme';
+import { COLORS, FONTS } from '@/theme';
+import { formatVnd } from '@/utils/finance';
 
 type Verdict = 'buy' | 'wait' | 'skip';
 type IconName = keyof typeof Ionicons.glyphMap;
 
-const vndFormatter = new Intl.NumberFormat('vi-VN', {
-  maximumFractionDigits: 0,
-});
-
-function formatVnd(value: number): string {
-  return `${vndFormatter.format(Math.round(value))} ₫`;
-}
 
 const VERDICT_STYLES: Record<
   Verdict,
   { color: string; background: string; label: string; summary: string; icon: IconName }
 > = {
   buy: {
-    color: COLORS.success,
+    color: COLORS.greenDeep,
     background: COLORS.mintSoft,
     label: 'CÓ THỂ MUA',
     summary: 'Phù hợp với kế hoạch hiện tại',
     icon: 'checkmark-circle',
   },
   wait: {
-    color: COLORS.amber,
+    color: COLORS.brass,
     background: COLORS.amberSoft,
     label: 'NÊN CHỜ',
     summary: 'Hoãn lại sẽ an toàn hơn',
     icon: 'time',
   },
   skip: {
-    color: COLORS.error,
+    color: COLORS.oxblood,
     background: COLORS.errorSoft,
     label: 'NÊN BỎ QUA',
     summary: 'Ưu tiên ngân sách và mục tiêu',
@@ -206,7 +200,9 @@ const styles = StyleSheet.create({
   verdictPanel: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 14,
+    borderRadius: 0,
+    borderWidth: 1,
+    borderColor: COLORS.borderStrong,
     padding: 10,
     marginBottom: 10,
   },
@@ -215,15 +211,17 @@ const styles = StyleSheet.create({
     height: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 18,
+    borderRadius: 0,
   },
   verdictCopy: { flex: 1, minWidth: 0, marginLeft: 9 },
-  verdictLabel: { fontSize: 10, fontWeight: '900', letterSpacing: 0.8 },
-  verdictSummary: { color: COLORS.text, fontSize: 11.5, fontWeight: '800', marginTop: 2 },
+  verdictLabel: { fontFamily: FONTS.mono, fontSize: 10, fontWeight: '900', letterSpacing: 0.8 },
+  verdictSummary: { color: COLORS.text, fontFamily: FONTS.display, fontSize: 16, marginTop: 2 },
   recordedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 11,
+    borderRadius: 0,
+    borderWidth: 1,
+    borderColor: COLORS.greenDeep,
     backgroundColor: COLORS.mintSoft,
     paddingHorizontal: 9,
     paddingVertical: 7,
@@ -233,7 +231,9 @@ const styles = StyleSheet.create({
   purchaseRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 13,
+    borderRadius: 0,
+    borderWidth: 1,
+    borderColor: COLORS.border,
     backgroundColor: COLORS.surfaceMuted,
     padding: 10,
     marginBottom: 10,
@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
     height: 34,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 11,
+    borderRadius: 0,
     backgroundColor: COLORS.mint,
   },
   purchaseCopy: { flex: 1, minWidth: 0, marginHorizontal: 9 },
@@ -277,7 +277,9 @@ const styles = StyleSheet.create({
   sourcePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 10,
+    borderRadius: 0,
+    borderWidth: 1,
+    borderColor: COLORS.border,
     backgroundColor: COLORS.surface,
     paddingHorizontal: 7,
     paddingVertical: 4,
@@ -298,7 +300,7 @@ const styles = StyleSheet.create({
     minHeight: 50,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 10,
+    borderRadius: 0,
     borderWidth: 1,
     borderColor: COLORS.borderStrong,
     backgroundColor: COLORS.surface,

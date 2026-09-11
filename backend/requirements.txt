@@ -1,7 +1,8 @@
 fastapi[all]==0.115.0
 uvicorn[standard]==0.30.0
 sqlalchemy[asyncio]==2.0.31
-asyncpg==0.29.0
+# 0.30.0 is the first release with CPython 3.13 support and Windows wheels.
+asyncpg==0.30.0
 alembic==1.13.1
 pydantic-settings==2.3.0
 python-dotenv==1.0.1

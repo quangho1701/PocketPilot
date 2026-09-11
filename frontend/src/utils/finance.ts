@@ -18,6 +18,15 @@ export function formatCompactVnd(value: number): string {
   return `${compactVndFormatter.format(value)} ₫`;
 }
 
+export function formatMonthYear(value: string | null): string | null {
+  if (!value) return null;
+  const [year, month] = value.split('-').map(Number);
+  if (!year || !month || month < 1 || month > 12) return null;
+  return new Intl.DateTimeFormat('vi-VN', { month: 'long', year: 'numeric' }).format(
+    new Date(year, month - 1, 1)
+  );
+}
+
 export function recurringTotal(setup: FinancialSetupPayload | null): number {
   return (
     setup?.recurring_expenses.reduce(

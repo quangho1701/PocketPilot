@@ -6,6 +6,7 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 from app.models.user_decision import DecisionType
+from app.schemas.goal_simulation import GoalSimulationResult
 
 
 # --- Request schemas ---
@@ -33,6 +34,9 @@ class ChatMessageResponse(BaseModel):
     amount: Optional[float]
     category: Optional[str]
     decision_id: Optional[str]
+    simulation_input: Optional[dict] = None
+    simulation_result: Optional[GoalSimulationResult] = None
+    simulation_schema_version: Optional[int] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
