@@ -278,6 +278,22 @@ class BudgetService:
             return None
         return await self._serialize_budget(budget)
 
+    async def list_budget_months(self, user_id: str) -> list[dict]:
+        result = await self.db.execute(
+            select(Budget)
+            .where(Budget.user_id == user_id)
+            .order_by(Budget.year.desc(), Budget.month.desc(), Budget.created_at.desc())
+        )
+        seen: set[tuple[int, int]] = set()
+        rows: list[dict] = []
+        for budget in result.scalars().unique().all():
+            key = (budget.year, budget.month)
+            if key in seen:
+                continue
+            seen.add(key)
+            rows.append(await self._serialize_budget(budget))
+        return rows
+
     async def _archive_active_budget(self, user_id: str, month: int, year: int) -> None:
         result = await self.db.execute(
             select(Budget).where(
@@ -390,7 +406,18 @@ class BudgetService:
 
         proposal["user_id"] = user_id
         proposal["goals"] = goals
-        proposal["planned_savings"] = round(max(proposal.get("planned_savings", 0.0), goal_savings), 2)
+        original_savings = float(proposal.get("planned_savings", 0.0))
+        planned_savings = round(min(max(original_savings, goal_savings), float(context.get("total_income", 0.0))), 2)
+        proposal["planned_savings"] = planned_savings
+        allocations = proposal.get("allocations", [])
+        allocation_total = sum(float(item.get("amount", 0.0)) for item in allocations)
+        allocatable = max(float(context.get("total_income", 0.0)) - planned_savings, 0.0)
+        if allocations and allocation_total and abs(allocation_total - allocatable) > 0.01:
+            scale = allocatable / allocation_total
+            for item in allocations:
+                item["amount"] = round(float(item.get("amount", 0.0)) * scale, 2)
+            correction = round(allocatable - sum(float(item.get("amount", 0.0)) for item in allocations), 2)
+            allocations[-1]["amount"] = round(float(allocations[-1].get("amount", 0.0)) + correction, 2)
         return proposal
 
     async def generate_ai_personalized_proposal(
@@ -681,6 +708,36 @@ class BudgetService:
             proposal = await self.generate_proposal(user_id, budgeting_mode, context)
             source = "deterministic"
 
+        profile = await self.db.scalar(select(UserProfile).where(UserProfile.user_id == user_id))
+        preferences = ((profile.spending_categories or {}).get("preferred_budget_allocations", {}) if profile else {})
+        if preferences and budgeting_mode != "custom":
+            allocations = proposal.get("allocations", [])
+            preferred_rows = []
+            other_rows = []
+            for item in allocations:
+                slug = item.get("category_slug") or item.get("category_id")
+                if slug in preferences:
+                    item["amount"] = float(preferences[slug])
+                    preferred_rows.append(item)
+                else:
+                    other_rows.append(item)
+            income = float(proposal.get("total_income", 0))
+            preferred_total = sum(float(item.get("amount", 0)) for item in preferred_rows)
+            if preferred_total > income:
+                raise ValueError("future category preferences exceed income")
+            desired_other_total = max(income - float(proposal.get("planned_savings", 0)) - preferred_total, 0)
+            other_total = sum(float(item.get("amount", 0)) for item in other_rows)
+            if other_rows and other_total > desired_other_total:
+                scale = desired_other_total / other_total
+                for item in other_rows:
+                    item["amount"] = round(float(item.get("amount", 0)) * scale, 2)
+                correction = round(desired_other_total - sum(float(item.get("amount", 0)) for item in other_rows), 2)
+                other_rows[-1]["amount"] = round(float(other_rows[-1].get("amount", 0)) + correction, 2)
+            proposal["planned_savings"] = max(
+                income - sum(float(item.get("amount", 0)) for item in allocations),
+                0,
+            )
+
         valid, errors = await self.validate_proposal(proposal)
         if not valid:
             raise ValueError("; ".join(errors))
@@ -756,6 +813,181 @@ class BudgetService:
 
         await self.db.flush()
         return await self._serialize_budget(budget)
+
+    async def update_category_allocation(
+        self, user_id: str, budget_id: str, category_id: str, amount: float, apply_to_future: bool
+    ) -> dict:
+        budget = await self.db.scalar(select(Budget).where(Budget.id == budget_id, Budget.user_id == user_id))
+        if not budget:
+            raise ValueError("budget not found")
+        if budget.status not in {"draft", "active"}:
+            raise ValueError("archived budgets cannot be edited")
+        allocation = await self.db.scalar(select(BudgetAllocation).where(
+            BudgetAllocation.budget_id == budget_id, BudgetAllocation.category_id == category_id
+        ))
+        if not allocation:
+            raise ValueError("category allocation not found")
+        other_total = sum(float(row.allocated_amount) for row in budget.allocations if row.category_id != category_id)
+        if other_total + amount > float(budget.total_income):
+            raise ValueError("allocation total exceeds income")
+        allocation.allocated_amount = float(amount)
+        budget.planned_savings = round(float(budget.total_income) - other_total - float(amount), 2)
+
+        category = await self.db.scalar(select(BudgetCategory).where(BudgetCategory.id == category_id))
+        profile = await self.db.scalar(select(UserProfile).where(UserProfile.user_id == user_id))
+        if profile and category:
+            settings = dict(profile.spending_categories or {})
+            preferred = dict(settings.get("preferred_budget_allocations", {}))
+            if apply_to_future:
+                preferred[category.slug] = float(amount)
+            else:
+                preferred.pop(category.slug, None)
+            settings["preferred_budget_allocations"] = preferred
+            profile.spending_categories = settings
+        await self.db.flush()
+        return await self._serialize_budget(budget)
+
+    async def get_category_detail(self, user_id: str, budget_id: str, category_id: str) -> dict:
+        budget = await self.db.scalar(select(Budget).where(Budget.id == budget_id, Budget.user_id == user_id))
+        category = await self.db.scalar(select(BudgetCategory).where(BudgetCategory.id == category_id))
+        allocation = await self.db.scalar(select(BudgetAllocation).where(
+            BudgetAllocation.budget_id == budget_id, BudgetAllocation.category_id == category_id
+        ))
+        if not budget or not category or not allocation:
+            raise ValueError("category detail not found")
+        memories = list((await self.db.execute(select(FinancialMemory).where(
+            FinancialMemory.user_id == user_id,
+            FinancialMemory.memory_type == MemoryType.TRANSACTION,
+            FinancialMemory.is_deleted == False,
+            FinancialMemory.category == category.slug,
+        ))).scalars().all())
+        spent: dict[tuple[int, int], float] = defaultdict(float)
+        for memory in memories:
+            txn_date = memory.created_at.date()
+            raw = (memory.details or {}).get("date")
+            if raw:
+                try: txn_date = date.fromisoformat(str(raw))
+                except ValueError: pass
+            spent[(txn_date.year, txn_date.month)] += float(memory.amount or 0)
+        budgets = list((await self.db.execute(
+            select(Budget).where(Budget.user_id == user_id).order_by(Budget.year.desc(), Budget.month.desc())
+        )).scalars().unique().all())
+        history = []
+        seen: set[tuple[int, int]] = set()
+        for item in budgets:
+            key = (item.year, item.month)
+            if key in seen: continue
+            matching = next((a for a in item.allocations if a.category_id == category_id), None)
+            if matching:
+                seen.add(key)
+                history.append({"month": item.month, "year": item.year, "allocated_amount": matching.allocated_amount, "spent_amount": spent[key]})
+            if len(history) == 12: break
+        history.reverse()
+        current_spent = spent[(budget.year, budget.month)]
+        profile = await self.db.scalar(select(UserProfile).where(UserProfile.user_id == user_id))
+        preferred = ((profile.spending_categories or {}).get("preferred_budget_allocations", {}) if profile else {})
+        budget_data = await self._serialize_budget(budget)
+        trailing_keys = []
+        cursor_year, cursor_month = budget.year, budget.month
+        for _ in range(12):
+            trailing_keys.append((cursor_year, cursor_month))
+            cursor_month -= 1
+            if cursor_month == 0:
+                cursor_month = 12; cursor_year -= 1
+        return {
+            "budget": budget_data,
+            "category": category,
+            "allocation": next(a for a in budget_data["allocations"] if a["category_id"] == category_id),
+            "spent_amount": current_spent,
+            "available_budget": max(float(budget.total_income) - sum(float(a.allocated_amount) for a in budget.allocations), 0),
+            "average_12_months": round(sum(spent[key] for key in trailing_keys) / 12, 2),
+            "apply_to_future": category.slug in preferred,
+            "history": history,
+        }
+
+    async def get_draft_goals(self, user_id: str) -> list[dict]:
+        profile = await self.db.scalar(select(UserProfile).where(UserProfile.user_id == user_id))
+        setup_goals = list((await self.db.execute(select(FinancialMemory).where(
+            FinancialMemory.user_id == user_id, FinancialMemory.memory_type == MemoryType.GOAL,
+            FinancialMemory.is_deleted == False,
+        ).order_by(FinancialMemory.created_at))).scalars().all())
+        if not profile:
+            return []
+        if (profile.spending_categories or {}).get("plan_goals_confirmed"):
+            return []
+        result = []
+        for position, goal in enumerate(setup_goals):
+            details = goal.details or {}
+            result.append({"key": details.get("id") or (goal.source_id or f"goal-{position + 1}").removeprefix("goal:"),
+                "name": goal.title, "target_amount": float(details.get("target_amount", goal.amount or 0)),
+                "current_amount": float(details.get("current_amount", 0)), "target_date": details.get("target_date"),
+                "goal_type": details.get("goal_type", goal.category or "other"),
+                "is_primary": bool(details.get("is_primary") or goal.source_id == "primary_goal")})
+        return result
+
+    async def get_plan_goal_confirmation(self, user_id: str) -> bool:
+        profile = await self.db.scalar(select(UserProfile).where(UserProfile.user_id == user_id))
+        return bool(profile and (profile.spending_categories or {}).get("plan_goals_confirmed"))
+
+    def _goal_dict(self, memory: FinancialMemory, *, primary: bool = False) -> dict:
+        details = memory.details or {}
+        return {"id": memory.id, "key": details.get("id") or (memory.source_id or memory.id).removeprefix("goal:"), "name": memory.title,
+                "target_amount": float(details.get("target_amount", memory.amount or 0)),
+                "current_amount": float(details.get("current_amount", 0)), "target_date": details.get("target_date"),
+                "goal_type": details.get("goal_type", memory.category or "other"), "is_primary": primary}
+
+    async def list_plan_goals(self, user_id: str) -> list[dict]:
+        goals = list((await self.db.execute(select(FinancialMemory).where(
+            FinancialMemory.user_id == user_id, FinancialMemory.memory_type == MemoryType.GOAL,
+            FinancialMemory.is_deleted == False,
+        ).order_by(FinancialMemory.created_at))).scalars().all())
+        return [self._goal_dict(g, primary=bool((g.details or {}).get("is_primary") or g.source_id == "primary_goal")) for g in goals]
+
+    async def confirm_draft_goals(self, user_id: str, goals: list[dict]) -> list[dict]:
+        memories = list((await self.db.execute(select(FinancialMemory).where(
+            FinancialMemory.user_id == user_id, FinancialMemory.memory_type == MemoryType.GOAL,
+            FinancialMemory.is_deleted == False))).scalars().all())
+        by_key = {self._goal_dict(memory)["key"]: memory for memory in memories}
+        submitted = {goal["key"] for goal in goals}
+        for memory in memories:
+            if self._goal_dict(memory)["key"] not in submitted:
+                memory.is_deleted = True; memory.deleted_at = datetime.now(UTC)
+        has_primary = any(goal.get("is_primary") for goal in goals)
+        for position, goal in enumerate(goals):
+            memory = by_key.get(goal["key"])
+            if memory is None:
+                memory = FinancialMemory(user_id=user_id, memory_type=MemoryType.GOAL, source="plan", source_id=f"goal:{goal['key']}")
+                self.db.add(memory)
+            memory.title = goal["name"]; memory.content = f"Plan goal: {goal['name']}"; memory.amount = goal["target_amount"]; memory.category = goal["goal_type"]
+            memory.details = {**(memory.details or {}), **{k: goal.get(k) for k in ("target_amount", "current_amount", "target_date", "goal_type")},
+                              "id": goal["key"], "position": position, "is_primary": bool(goal.get("is_primary") or (not has_primary and position == 0))}
+        profile = await self.db.scalar(select(UserProfile).where(UserProfile.user_id == user_id))
+        if profile:
+            settings = dict(profile.spending_categories or {}); settings["plan_goals_confirmed"] = True; profile.spending_categories = settings
+        await self.db.flush()
+        return await self.list_plan_goals(user_id)
+
+    async def create_plan_goal(self, user_id: str, data: dict) -> dict:
+        existing_count = await self.db.scalar(select(func.count()).select_from(FinancialMemory).where(
+            FinancialMemory.user_id == user_id, FinancialMemory.memory_type == MemoryType.GOAL,
+            FinancialMemory.is_deleted == False))
+        details = dict(data)
+        details.update({"is_primary": not existing_count, "status": "active"})
+        memory = FinancialMemory(user_id=user_id, memory_type=MemoryType.GOAL, title=data["name"],
+            content=f"Plan goal: {data['name']}", amount=data["target_amount"], category=data.get("goal_type", "other"),
+            details=details, source="plan", source_id=f"plan-{datetime.now(UTC).timestamp()}")
+        self.db.add(memory); await self.db.flush(); return self._goal_dict(memory, primary=not existing_count)
+
+    async def update_plan_goal(self, user_id: str, goal_id: str, data: dict) -> dict:
+        memory = await self.db.scalar(select(FinancialMemory).where(
+            FinancialMemory.id == goal_id, FinancialMemory.user_id == user_id,
+            FinancialMemory.memory_type == MemoryType.GOAL, FinancialMemory.is_deleted == False))
+        if not memory: raise ValueError("goal not found")
+        details = dict(memory.details or {}); details.update(data)
+        memory.title = data.get("name", memory.title); memory.amount = data.get("target_amount", memory.amount)
+        memory.category = data.get("goal_type", memory.category); memory.details = details
+        memory.content = f"Financial goal: {memory.title}"
+        await self.db.flush(); return self._goal_dict(memory, primary=memory.source == "financial_setup")
 
     async def approve_budget(self, user_id: str, budget_id: str) -> dict:
         budget = await self.db.scalar(

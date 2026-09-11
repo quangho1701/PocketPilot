@@ -7,6 +7,12 @@ export type MainTabParamList = {
   Memory: undefined;
 };
 
+export type PlanStackParamList = {
+  PlanMain: undefined;
+  DraftPlan: undefined;
+  BudgetEdit: { budgetId: string; categoryId: string };
+};
+
 export type RootStackParamList = {
   MainTabs: NavigatorScreenParams<MainTabParamList> | undefined;
   FinancialSetup: { mode: 'initial' | 'edit' };

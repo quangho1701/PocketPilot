@@ -9,6 +9,7 @@ export interface RecurringExpenseInput {
 }
 
 export interface PrimaryGoalInput {
+  id: string;
   goal_type: string;
   name: string;
   target_amount: number;
@@ -21,7 +22,8 @@ export interface FinancialSetupPayload {
   monthly_income: number;
   income_frequency: IncomeFrequency;
   recurring_expenses: RecurringExpenseInput[];
-  primary_goal: PrimaryGoalInput;
+  goals: PrimaryGoalInput[];
+  primary_goal_id: string | null;
   savings_priority: SavingsPriority;
   focus_categories: string[];
   financial_situation_notes: string | null;
@@ -32,4 +34,9 @@ export interface FinancialSetupResponse {
   status: 'not_started' | 'completed';
   completed_at: string | null;
   data: FinancialSetupPayload | null;
+}
+
+export function getPrimaryGoal(setup: FinancialSetupPayload | null | undefined): PrimaryGoalInput | null {
+  if (!setup?.goals.length) return null;
+  return setup.goals.find((goal) => goal.id === setup.primary_goal_id) ?? setup.goals[0];
 }

@@ -37,7 +37,10 @@ type IconName = ComponentProps<typeof Ionicons>['name'];
 type DraftAction =
   | { type: 'replace'; payload: FinancialSetupPayload }
   | { type: 'patch'; patch: Partial<FinancialSetupPayload> }
-  | { type: 'patch_goal'; patch: Partial<PrimaryGoalInput> }
+  | { type: 'patch_goal'; index: number; patch: Partial<PrimaryGoalInput> }
+  | { type: 'add_goal'; goal: PrimaryGoalInput }
+  | { type: 'remove_goal'; index: number }
+  | { type: 'set_primary_goal'; id: string }
   | { type: 'upsert_expense'; index: number | null; expense: RecurringExpenseInput }
   | { type: 'remove_expense'; index: number };
 
@@ -185,13 +188,8 @@ const DEFAULT_DRAFT: FinancialSetupPayload = {
   monthly_income: 0,
   income_frequency: 'monthly',
   recurring_expenses: [],
-  primary_goal: {
-    goal_type: '',
-    name: '',
-    target_amount: 0,
-    current_amount: 0,
-    target_date: null,
-  },
+  goals: [],
+  primary_goal_id: null,
   savings_priority: 'balanced',
   focus_categories: [],
   financial_situation_notes: null,
@@ -210,8 +208,11 @@ function setupReducer(
     case 'patch_goal':
       return {
         ...state,
-        primary_goal: { ...state.primary_goal, ...action.patch },
+        goals: state.goals.map((goal, index) => index === action.index ? { ...goal, ...action.patch } : goal),
       };
+    case 'add_goal': return { ...state, goals: [...state.goals, action.goal], primary_goal_id: state.primary_goal_id ?? action.goal.id };
+    case 'remove_goal': { const goals = state.goals.filter((_, index) => index !== action.index); return { ...state, goals, primary_goal_id: goals.some(goal => goal.id === state.primary_goal_id) ? state.primary_goal_id : goals[0]?.id ?? null }; }
+    case 'set_primary_goal': return { ...state, primary_goal_id: action.id };
     case 'upsert_expense': {
       if (action.index === null) {
         return {
@@ -279,10 +280,7 @@ function normalizePayload(draft: FinancialSetupPayload): FinancialSetupPayload {
       ...expense,
       name: expense.name.trim(),
     })),
-    primary_goal: {
-      ...draft.primary_goal,
-      name: draft.primary_goal.name.trim(),
-    },
+    goals: draft.goals.map(goal => ({ ...goal, name: goal.name.trim() })),
     financial_situation_notes: notes ? notes : null,
   };
 }
@@ -826,22 +824,30 @@ function ExpensesStep({
 }
 
 function GoalStep({
-  goal,
+  goals,
+  primaryGoalId,
   dispatch,
   clearError,
 }: {
-  goal: PrimaryGoalInput;
+  goals: PrimaryGoalInput[];
+  primaryGoalId: string | null;
   dispatch: React.Dispatch<DraftAction>;
   clearError: () => void;
 }) {
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const goal = goals[Math.min(selectedIndex, Math.max(goals.length - 1, 0))];
+  const addGoal = () => { const id = `goal-${Date.now()}`; dispatch({ type: 'add_goal', goal: { id, goal_type: '', name: '', target_amount: 0, current_amount: 0, target_date: null } }); setSelectedIndex(goals.length); clearError(); };
   return (
     <View testID="financial-setup-step-3">
       <StepHeading
-        eyebrow="Mục tiêu chính"
-        title="Điều gì quan trọng nhất với bạn lúc này?"
-        description="Chọn một mục tiêu để PocketPilot ưu tiên trong kế hoạch đầu tiên."
+        eyebrow="Mục tiêu tài chính"
+        title="Bạn đang hướng tới những mục tiêu nào?"
+        description="Thêm một hoặc nhiều mục tiêu. Bạn cũng có thể tiếp tục mà chưa đặt mục tiêu."
         icon="flag-outline"
       />
+      <View style={styles.setupGoalList}>{goals.map((item, index) => <Pressable key={item.id} onPress={() => setSelectedIndex(index)} style={[styles.setupGoalRow, index === selectedIndex && styles.setupGoalRowActive]}><Ionicons name="flag-outline" size={17} color={COLORS.indigo}/><View style={{flex:1}}><Text style={styles.setupGoalName}>{item.name || `Mục tiêu ${index + 1}`}</Text><Text style={styles.setupGoalMeta}>{formatCurrency(item.target_amount)}</Text></View><Pressable onPress={() => dispatch({type:'set_primary_goal',id:item.id})}><Ionicons name={primaryGoalId===item.id?'star':'star-outline'} size={19} color={COLORS.amber}/></Pressable><Pressable onPress={() => { dispatch({type:'remove_goal',index}); setSelectedIndex(Math.max(0,index-1)); }}><Ionicons name="trash-outline" size={18} color={COLORS.error}/></Pressable></Pressable>)}</View>
+      <Pressable style={styles.addExpenseButton} onPress={addGoal}><Ionicons name="add" size={18} color={COLORS.surface}/><Text style={styles.addExpenseButtonText}>Thêm mục tiêu</Text></Pressable>
+      {!goal ? <View style={styles.emptyCard}><Ionicons name="flag-outline" size={28} color={COLORS.muted}/><Text style={styles.emptyTitle}>Chưa có mục tiêu</Text><Text style={styles.emptyText}>Bạn có thể thêm mục tiêu ngay bây giờ hoặc tiếp tục mà không có mục tiêu.</Text></View> : <>
       <Text style={styles.fieldLabel}>Loại mục tiêu</Text>
       <View style={styles.goalGrid} accessibilityRole="radiogroup">
         {GOAL_TYPES.map((goalType) => {
@@ -851,7 +857,7 @@ function GoalStep({
               key={goalType.value}
               onPress={() => {
                 clearError();
-                dispatch({ type: 'patch_goal', patch: { goal_type: goalType.value } });
+                dispatch({ type: 'patch_goal', index: selectedIndex, patch: { goal_type: goalType.value } });
               }}
               style={[styles.goalTypeCard, selected && styles.goalTypeCardSelected]}
               accessibilityRole="radio"
@@ -886,7 +892,7 @@ function GoalStep({
           value={goal.name}
           onChangeText={(name) => {
             clearError();
-            dispatch({ type: 'patch_goal', patch: { name } });
+            dispatch({ type: 'patch_goal', index: selectedIndex, patch: { name } });
           }}
           placeholder="Ví dụ: Quỹ dự phòng 6 tháng"
           placeholderTextColor={COLORS.muted}
@@ -900,7 +906,7 @@ function GoalStep({
         value={goal.target_amount}
         onChange={(targetAmount) => {
           clearError();
-          dispatch({ type: 'patch_goal', patch: { target_amount: targetAmount } });
+          dispatch({ type: 'patch_goal', index: selectedIndex, patch: { target_amount: targetAmount } });
         }}
         accessibilityLabel="Số tiền mục tiêu, đơn vị đồng"
       />
@@ -909,7 +915,7 @@ function GoalStep({
         value={goal.current_amount}
         onChange={(currentAmount) => {
           clearError();
-          dispatch({ type: 'patch_goal', patch: { current_amount: currentAmount } });
+          dispatch({ type: 'patch_goal', index: selectedIndex, patch: { current_amount: currentAmount } });
         }}
         accessibilityLabel="Số tiền hiện đã có cho mục tiêu, đơn vị đồng"
         helper="Để trống nếu bạn chưa bắt đầu."
@@ -922,7 +928,7 @@ function GoalStep({
           onChangeText={(targetDate) => {
             clearError();
             dispatch({
-              type: 'patch_goal',
+              type: 'patch_goal', index: selectedIndex,
               patch: { target_date: targetDate.trim() ? targetDate : null },
             });
           }}
@@ -936,7 +942,7 @@ function GoalStep({
           style={styles.unspecifiedButton}
           onPress={() => {
             clearError();
-            dispatch({ type: 'patch_goal', patch: { target_date: null } });
+            dispatch({ type: 'patch_goal', index: selectedIndex, patch: { target_date: null } });
           }}
           accessibilityRole="button"
           accessibilityState={{ selected: goal.target_date === null }}
@@ -949,7 +955,7 @@ function GoalStep({
           />
           <Text style={styles.unspecifiedText}>Chưa xác định</Text>
         </Pressable>
-      </View>
+      </View></>}
     </View>
   );
 }
@@ -1188,28 +1194,12 @@ function ReviewStep({
       </ReviewSection>
 
       <ReviewSection
-        title="Mục tiêu chính"
+        title="Mục tiêu tài chính"
         icon="flag-outline"
         editStep={3}
         onEdit={() => onEdit(2)}
       >
-        <ReviewRow
-          label="Loại mục tiêu"
-          value={labelForValue(GOAL_TYPES, draft.primary_goal.goal_type)}
-        />
-        <ReviewRow label="Tên" value={draft.primary_goal.name} />
-        <ReviewRow
-          label="Mục tiêu"
-          value={formatCurrency(draft.primary_goal.target_amount)}
-        />
-        <ReviewRow
-          label="Đã có"
-          value={formatCurrency(draft.primary_goal.current_amount)}
-        />
-        <ReviewRow
-          label="Ngày dự kiến"
-          value={draft.primary_goal.target_date ?? 'Chưa xác định'}
-        />
+        {draft.goals.length ? draft.goals.map((goal, index) => <View key={goal.id}><ReviewRow label={`${goal.id === draft.primary_goal_id ? '★ ' : ''}${goal.name}`} value={formatCurrency(goal.target_amount)} />{index < draft.goals.length - 1 ? <View style={styles.reviewDivider}/> : null}</View>) : <ReviewRow label="Mục tiêu" value="Chưa có — bạn có thể thêm sau" />}
       </ReviewSection>
 
       <ReviewSection
@@ -1406,28 +1396,13 @@ export default function FinancialSetupScreen({ navigation, route }: Props) {
       return 'Hãy thêm hoặc hủy khoản chi đang nhập trước khi tiếp tục.';
     }
     if (step === 2) {
-      if (!draft.primary_goal.goal_type) return 'Hãy chọn một loại mục tiêu.';
-      if (!draft.primary_goal.name.trim()) return 'Hãy nhập tên mục tiêu.';
-      if (
-        !Number.isInteger(draft.primary_goal.target_amount) ||
-        draft.primary_goal.target_amount <= 0
-      ) {
-        return 'Số tiền mục tiêu phải lớn hơn 0.';
-      }
-      if (
-        !Number.isInteger(draft.primary_goal.current_amount) ||
-        draft.primary_goal.current_amount < 0
-      ) {
-        return 'Số tiền hiện có không được âm.';
-      }
-      if (draft.primary_goal.current_amount > draft.primary_goal.target_amount) {
-        return 'Số tiền hiện có không thể lớn hơn số tiền mục tiêu.';
-      }
-      if (
-        draft.primary_goal.target_date !== null &&
-        !isValidIsoDate(draft.primary_goal.target_date)
-      ) {
-        return 'Ngày dự kiến phải đúng định dạng YYYY-MM-DD.';
+      for (const goal of draft.goals) {
+        if (!goal.goal_type) return 'Hãy chọn loại cho mỗi mục tiêu.';
+        if (!goal.name.trim()) return 'Hãy nhập tên cho mỗi mục tiêu.';
+        if (!Number.isInteger(goal.target_amount) || goal.target_amount <= 0) return 'Số tiền mục tiêu phải lớn hơn 0.';
+        if (!Number.isInteger(goal.current_amount) || goal.current_amount < 0) return 'Số tiền hiện có không được âm.';
+        if (goal.current_amount > goal.target_amount) return 'Số tiền hiện có không thể lớn hơn số tiền mục tiêu.';
+        if (goal.target_date !== null && !isValidIsoDate(goal.target_date)) return 'Ngày dự kiến phải đúng định dạng YYYY-MM-DD.';
       }
     }
     return null;
@@ -1506,7 +1481,8 @@ export default function FinancialSetupScreen({ navigation, route }: Props) {
       case 2:
         return (
           <GoalStep
-            goal={draft.primary_goal}
+            goals={draft.goals}
+            primaryGoalId={draft.primary_goal_id}
             dispatch={dispatch}
             clearError={() => setValidationError(null)}
           />
@@ -1984,6 +1960,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   addButtonText: { color: COLORS.surface, fontSize: 13, fontWeight: '900' },
+  setupGoalList: { marginBottom: 10 },
+  setupGoalRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: COLORS.border, padding: 11, marginBottom: 7 },
+  setupGoalRowActive: { borderColor: COLORS.indigo, backgroundColor: COLORS.indigoLight },
+  setupGoalName: { color: COLORS.text, fontSize: 13, fontWeight: '800' },
+  setupGoalMeta: { color: COLORS.muted, fontSize: 10, marginTop: 2 },
+  emptyCard: { alignItems: 'center', borderWidth: 1, borderStyle: 'dashed', borderColor: COLORS.border, padding: 22, marginVertical: 16 },
+  emptyTitle: { color: COLORS.text, fontSize: 15, fontWeight: '800', marginTop: 8 },
+  emptyText: { color: COLORS.muted, fontSize: 11, textAlign: 'center', lineHeight: 17, marginTop: 4 },
+  addExpenseButton: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, backgroundColor: COLORS.indigo, marginBottom: 18 },
+  addExpenseButtonText: { color: COLORS.surface, fontSize: 12, fontWeight: '900' },
   goalGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginBottom: 22 },
   goalTypeCard: {
     width: '48.5%',

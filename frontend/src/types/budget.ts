@@ -76,3 +76,13 @@ export interface BudgetProposalUpdateRequest {
   planned_savings?: number;
   allocations?: BudgetAllocationUpdate[];
 }
+
+export interface CategoryHistoryPoint { month: number; year: number; allocated_amount: number; spent_amount: number }
+export interface CategoryDetail {
+  budget: Budget; category: BudgetCategory; allocation: BudgetAllocation; spent_amount: number;
+  available_budget: number; average_12_months: number; apply_to_future: boolean; history: CategoryHistoryPoint[];
+}
+export interface PlanGoalDraft { key: string; name: string; target_amount: number; current_amount: number; target_date: string | null; goal_type: string; is_primary: boolean }
+export interface PlanGoalDraftState { confirmed: boolean; goals: PlanGoalDraft[] }
+export interface PlanGoal extends PlanGoalDraft { id: string; is_primary: boolean }
+export interface PlanGoalInput { name: string; target_amount: number; current_amount?: number; target_date?: string | null; goal_type?: string }

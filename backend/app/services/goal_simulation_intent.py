@@ -25,6 +25,10 @@ _RECURRING_PATTERN = re.compile(r"\b(?:every|per|a)\s+(week|month)\b|mỗi\s+(tu
 _SAVINGS_PATTERN = re.compile(r"\b(?:save|saving|set aside)\b|để dành|tiết kiệm", re.IGNORECASE)
 _EXPENSE_PATTERN = re.compile(r"\b(?:spend|spending|buy|purchase)\b|\bchi\b|\bmua\b", re.IGNORECASE)
 _OFFSET_PATTERN = re.compile(r"\b(?:offset that|make up for that|how much more.*save)\b", re.IGNORECASE)
+_GOAL_CHANGE_PATTERN = re.compile(
+    r"\b(?:another|other|different|change|switch)\s+(?:goal|target)\b|mục tiêu khác|đổi mục tiêu|chuyển mục tiêu",
+    re.IGNORECASE,
+)
 _SIMULATION_CONTEXT_PATTERN = re.compile(
     r"\b(?:if|what if|affect|impact|goal|target|reach|delay|future plan|scenario)\b"
     r"|nếu|mục tiêu|ảnh hưởng|tác động|thay đổi|chậm|bao giờ|khi nào|kế hoạch",
@@ -74,7 +78,7 @@ class GoalSimulationIntentResolver:
 
         goals = await self._get_active_goals(user_id)
         goal_id, goal_clarification = self._resolve_goal(message, goals)
-        if previous_request and goal_id is None and goal_clarification == "Bạn muốn mô phỏng mục tiêu nào?":
+        if previous_request and not _GOAL_CHANGE_PATTERN.search(message) and goal_id is None and goal_clarification == "Bạn muốn mô phỏng mục tiêu nào?":
             goal_id = previous_request.target_goal_id
             goal_clarification = None
         return GoalSimulationIntent(
@@ -189,11 +193,11 @@ class GoalSimulationIntentResolver:
 
     @staticmethod
     def _resolve_goal(message: str, goals: list[FinancialMemory]) -> tuple[str | None, str | None]:
-        normalized_message = re.sub(r"[^a-z0-9]+", " ", message.lower()).strip()
+        normalized_message = " ".join("".join(character if character.isalnum() else " " for character in message.casefold()).split())
         matches = []
         for goal in goals:
             name = str((goal.details or {}).get("name", goal.title))
-            normalized_name = re.sub(r"[^a-z0-9]+", " ", name.lower()).strip()
+            normalized_name = " ".join("".join(character if character.isalnum() else " " for character in name.casefold()).split())
             if normalized_name and normalized_name in normalized_message:
                 matches.append(goal)
 

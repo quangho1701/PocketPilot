@@ -25,7 +25,7 @@ class RecurringExpenseSetup(BaseModel):
     monthly_amount: PositiveVND
 
 
-class PrimaryGoalSetup(BaseModel):
+class GoalSetup(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     goal_type: str = Field(min_length=1, max_length=50)
@@ -33,9 +33,10 @@ class PrimaryGoalSetup(BaseModel):
     target_amount: PositiveVND
     current_amount: NonNegativeVND = 0
     target_date: Optional[date] = None
+    id: Optional[str] = Field(default=None, max_length=80)
 
     @model_validator(mode="after")
-    def validate_progress(self) -> PrimaryGoalSetup:
+    def validate_progress(self) -> GoalSetup:
         if self.current_amount > self.target_amount:
             raise ValueError("current_amount must not exceed target_amount")
         return self
@@ -50,11 +51,41 @@ class FinancialSetupPayload(BaseModel):
     recurring_expenses: list[RecurringExpenseSetup] = Field(
         default_factory=list, max_length=50
     )
-    primary_goal: PrimaryGoalSetup
+    goals: list[GoalSetup] = Field(default_factory=list, max_length=50)
+    primary_goal_id: Optional[str] = Field(default=None, max_length=80)
     savings_priority: Literal["minimal", "balanced", "aggressive"] = "balanced"
     focus_categories: list[str] = Field(default_factory=list, max_length=50)
     financial_situation_notes: Optional[str] = Field(default=None, max_length=2000)
     setup_version: Literal[1] = 1
+
+    @model_validator(mode="before")
+    @classmethod
+    def migrate_legacy_primary_goal(cls, value):
+        if isinstance(value, dict) and "goals" not in value and value.get("primary_goal"):
+            value = dict(value)
+            legacy = dict(value.pop("primary_goal"))
+            legacy.setdefault("id", "primary_goal")
+            value["goals"] = [legacy]
+            value["primary_goal_id"] = legacy["id"]
+        return value
+
+    @model_validator(mode="after")
+    def validate_primary_goal(self):
+        ids = [goal.id for goal in self.goals if goal.id]
+        if len(ids) != len(set(ids)):
+            raise ValueError("goal ids must be unique")
+        if self.primary_goal_id and self.primary_goal_id not in ids:
+            raise ValueError("primary_goal_id must reference a goal")
+        if self.goals and not self.primary_goal_id:
+            self.primary_goal_id = self.goals[0].id
+        return self
+
+
+    @property
+    def primary_goal(self) -> Optional[GoalSetup]:
+        if not self.goals:
+            return None
+        return next((goal for goal in self.goals if goal.id == self.primary_goal_id), self.goals[0])
 
     @field_validator("focus_categories")
     @classmethod
@@ -76,6 +107,10 @@ class FinancialSetupPayload(BaseModel):
     @classmethod
     def empty_notes_are_none(cls, value: Optional[str]) -> Optional[str]:
         return value or None
+
+
+# Compatibility export for integrations that imported the former singular type.
+PrimaryGoalSetup = GoalSetup
 
 
 class FinancialSetupResponse(BaseModel):

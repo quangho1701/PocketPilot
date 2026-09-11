@@ -383,6 +383,23 @@ class TestChat:
             await session.close()
             await engine.dispose()
 
+    @pytest.mark.asyncio
+    async def test_follow_up_can_switch_goal_and_vague_switch_requires_choice(self):
+        session, engine = await new_session()
+        try:
+            japan = await seed_goal(session)
+            laptop = await seed_goal(session, name="Máy tính mới", target_amount=1500, current_amount=400)
+            previous = one_time_request(japan.id).model_dump(mode="json")
+            resolver = GoalSimulationIntentResolver(session)
+            explicit = await resolver.resolve("user-1", "Nếu chi 300 thì Máy tính mới bị ảnh hưởng thế nào?", previous_simulation_input=previous)
+            vague = await resolver.resolve("user-1", "What if I spend 300 on another goal?", previous_simulation_input=previous)
+            assert explicit is not None and explicit.goal_id == laptop.id
+            assert vague is not None and vague.goal_id is None
+            assert vague.clarification == "Bạn muốn mô phỏng mục tiêu nào?"
+        finally:
+            await session.close()
+            await engine.dispose()
+
 
 class TestCompletionRegressions:
     @pytest.mark.asyncio

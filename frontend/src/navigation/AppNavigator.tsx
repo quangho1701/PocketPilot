@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import MemoryScreen from '@/screens/memory/MemoryScreen';
 import AssistantScreen from '@/screens/assistant/AssistantScreen';
-import BudgetScreen from '@/screens/budget/BudgetScreen';
+import PlanNavigator from '@/screens/budget/PlanNavigator';
 import TransactionsScreen from '@/screens/transactions/TransactionsScreen';
 import FinancialSetupScreen from '@/screens/setup/FinancialSetupScreen';
 import { getFinancialSetup } from '@/services/setup';
@@ -70,7 +70,7 @@ function MainTabs() {
         component={AssistantScreen}
         options={{ title: 'Cố vấn' }}
       />
-      <Tab.Screen name="Budget" component={BudgetScreen} options={{ title: 'Kế hoạch' }} />
+      <Tab.Screen name="Budget" component={PlanNavigator} options={{ title: 'Kế hoạch' }} />
       <Tab.Screen name="Memory" component={MemoryScreen} options={{ title: 'Phân tích' }} />
     </Tab.Navigator>
   );
