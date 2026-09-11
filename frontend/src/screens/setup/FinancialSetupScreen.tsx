@@ -184,7 +184,7 @@ const FOCUS_CATEGORIES: Array<{ value: string; label: string; icon: IconName }> 
 ];
 
 const DEFAULT_DRAFT: FinancialSetupPayload = {
-  currency: 'VND',
+  currency: 'USD',
   monthly_income: 0,
   income_frequency: 'monthly',
   recurring_expenses: [],
@@ -241,7 +241,7 @@ function setupReducer(
 
 const vndFormatter = new Intl.NumberFormat('vi-VN', {
   style: 'currency',
-  currency: 'VND',
+  currency: 'USD',
   maximumFractionDigits: 0,
 });
 
@@ -327,7 +327,7 @@ function MoneyInput({
           returnKeyType="done"
         />
         <View style={styles.currencyBadge}>
-          <Text style={styles.currencySuffix}>VND</Text>
+          <Text style={styles.currencySuffix}>USD</Text>
         </View>
       </View>
       {helper ? <Text style={styles.helperText}>{helper}</Text> : null}

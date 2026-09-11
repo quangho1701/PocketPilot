@@ -85,4 +85,4 @@ export interface CategoryDetail {
 export interface PlanGoalDraft { key: string; name: string; target_amount: number; current_amount: number; target_date: string | null; goal_type: string; is_primary: boolean }
 export interface PlanGoalDraftState { confirmed: boolean; goals: PlanGoalDraft[] }
 export interface PlanGoal extends PlanGoalDraft { id: string; is_primary: boolean }
-export interface PlanGoalInput { name: string; target_amount: number; current_amount?: number; target_date?: string | null; goal_type?: string }
+export interface PlanGoalInput { name: string; target_amount: number; current_amount?: number; target_date?: string | null; goal_type?: string; is_primary?: boolean }

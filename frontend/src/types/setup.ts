@@ -18,7 +18,7 @@ export interface PrimaryGoalInput {
 }
 
 export interface FinancialSetupPayload {
-  currency: 'VND';
+  currency: 'USD' | 'VND';
   monthly_income: number;
   income_frequency: IncomeFrequency;
   recurring_expenses: RecurringExpenseInput[];

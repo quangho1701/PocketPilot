@@ -936,12 +936,16 @@ class BudgetService:
                 "current_amount": float(details.get("current_amount", 0)), "target_date": details.get("target_date"),
                 "goal_type": details.get("goal_type", memory.category or "other"), "is_primary": primary}
 
+    def _is_primary_goal(self, memory: FinancialMemory) -> bool:
+        details = memory.details or {}
+        return bool(details["is_primary"]) if "is_primary" in details else memory.source_id == "primary_goal"
+
     async def list_plan_goals(self, user_id: str) -> list[dict]:
         goals = list((await self.db.execute(select(FinancialMemory).where(
             FinancialMemory.user_id == user_id, FinancialMemory.memory_type == MemoryType.GOAL,
             FinancialMemory.is_deleted == False,
         ).order_by(FinancialMemory.created_at))).scalars().all())
-        return [self._goal_dict(g, primary=bool((g.details or {}).get("is_primary") or g.source_id == "primary_goal")) for g in goals]
+        return [self._goal_dict(g, primary=self._is_primary_goal(g)) for g in goals]
 
     async def confirm_draft_goals(self, user_id: str, goals: list[dict]) -> list[dict]:
         memories = list((await self.db.execute(select(FinancialMemory).where(
@@ -952,7 +956,7 @@ class BudgetService:
         for memory in memories:
             if self._goal_dict(memory)["key"] not in submitted:
                 memory.is_deleted = True; memory.deleted_at = datetime.now(UTC)
-        has_primary = any(goal.get("is_primary") for goal in goals)
+        primary_position = next((position for position, goal in enumerate(goals) if goal.get("is_primary")), 0) if goals else None
         for position, goal in enumerate(goals):
             memory = by_key.get(goal["key"])
             if memory is None:
@@ -960,7 +964,7 @@ class BudgetService:
                 self.db.add(memory)
             memory.title = goal["name"]; memory.content = f"Plan goal: {goal['name']}"; memory.amount = goal["target_amount"]; memory.category = goal["goal_type"]
             memory.details = {**(memory.details or {}), **{k: goal.get(k) for k in ("target_amount", "current_amount", "target_date", "goal_type")},
-                              "id": goal["key"], "position": position, "is_primary": bool(goal.get("is_primary") or (not has_primary and position == 0))}
+                              "id": goal["key"], "position": position, "is_primary": position == primary_position}
         profile = await self.db.scalar(select(UserProfile).where(UserProfile.user_id == user_id))
         if profile:
             settings = dict(profile.spending_categories or {}); settings["plan_goals_confirmed"] = True; profile.spending_categories = settings
@@ -968,26 +972,70 @@ class BudgetService:
         return await self.list_plan_goals(user_id)
 
     async def create_plan_goal(self, user_id: str, data: dict) -> dict:
-        existing_count = await self.db.scalar(select(func.count()).select_from(FinancialMemory).where(
+        existing = list((await self.db.execute(select(FinancialMemory).where(
             FinancialMemory.user_id == user_id, FinancialMemory.memory_type == MemoryType.GOAL,
-            FinancialMemory.is_deleted == False))
+            FinancialMemory.is_deleted == False).order_by(FinancialMemory.created_at, FinancialMemory.id))).scalars().all())
+        requested_primary = bool(data.pop("is_primary", False))
+        make_primary = requested_primary or not existing
+        if make_primary:
+            for goal in existing:
+                goal.details = {**(goal.details or {}), "is_primary": False}
         details = dict(data)
-        details.update({"is_primary": not existing_count, "status": "active"})
+        details.update({"is_primary": make_primary, "status": "active"})
         memory = FinancialMemory(user_id=user_id, memory_type=MemoryType.GOAL, title=data["name"],
             content=f"Plan goal: {data['name']}", amount=data["target_amount"], category=data.get("goal_type", "other"),
             details=details, source="plan", source_id=f"plan-{datetime.now(UTC).timestamp()}")
-        self.db.add(memory); await self.db.flush(); return self._goal_dict(memory, primary=not existing_count)
+        self.db.add(memory); await self.db.flush(); return self._goal_dict(memory, primary=make_primary)
 
     async def update_plan_goal(self, user_id: str, goal_id: str, data: dict) -> dict:
         memory = await self.db.scalar(select(FinancialMemory).where(
             FinancialMemory.id == goal_id, FinancialMemory.user_id == user_id,
             FinancialMemory.memory_type == MemoryType.GOAL, FinancialMemory.is_deleted == False))
         if not memory: raise ValueError("goal not found")
+        next_target = float(data.get("target_amount", (memory.details or {}).get("target_amount", memory.amount or 0)))
+        next_current = float(data.get("current_amount", (memory.details or {}).get("current_amount", 0)))
+        if next_current > next_target:
+            raise ValueError("current amount cannot exceed target amount")
+        requested_primary = data.pop("is_primary", None)
         details = dict(memory.details or {}); details.update(data)
+        if requested_primary is True:
+            other_goals = list((await self.db.execute(select(FinancialMemory).where(
+                FinancialMemory.user_id == user_id, FinancialMemory.memory_type == MemoryType.GOAL,
+                FinancialMemory.is_deleted == False, FinancialMemory.id != goal_id))).scalars().all())
+            for goal in other_goals:
+                goal.details = {**(goal.details or {}), "is_primary": False}
+            details["is_primary"] = True
+        elif requested_primary is False and details.get("is_primary"):
+            replacement = await self.db.scalar(select(FinancialMemory).where(
+                FinancialMemory.user_id == user_id, FinancialMemory.memory_type == MemoryType.GOAL,
+                FinancialMemory.is_deleted == False, FinancialMemory.id != goal_id,
+            ).order_by(FinancialMemory.created_at, FinancialMemory.id))
+            details["is_primary"] = False
+            if replacement:
+                replacement.details = {**(replacement.details or {}), "is_primary": True}
         memory.title = data.get("name", memory.title); memory.amount = data.get("target_amount", memory.amount)
         memory.category = data.get("goal_type", memory.category); memory.details = details
         memory.content = f"Financial goal: {memory.title}"
-        await self.db.flush(); return self._goal_dict(memory, primary=memory.source == "financial_setup")
+        await self.db.flush(); return self._goal_dict(memory, primary=bool(details.get("is_primary")))
+
+    async def delete_plan_goal(self, user_id: str, goal_id: str) -> list[dict]:
+        memory = await self.db.scalar(select(FinancialMemory).where(
+            FinancialMemory.id == goal_id, FinancialMemory.user_id == user_id,
+            FinancialMemory.memory_type == MemoryType.GOAL, FinancialMemory.is_deleted == False))
+        if not memory:
+            raise ValueError("goal not found")
+        was_primary = self._is_primary_goal(memory)
+        memory.is_deleted = True
+        memory.deleted_at = datetime.now(UTC)
+        remaining = list((await self.db.execute(select(FinancialMemory).where(
+            FinancialMemory.user_id == user_id, FinancialMemory.memory_type == MemoryType.GOAL,
+            FinancialMemory.is_deleted == False, FinancialMemory.id != goal_id,
+        ).order_by(FinancialMemory.created_at, FinancialMemory.id))).scalars().all())
+        if was_primary and remaining:
+            for position, goal in enumerate(remaining):
+                goal.details = {**(goal.details or {}), "is_primary": position == 0}
+        await self.db.flush()
+        return [self._goal_dict(goal, primary=bool((goal.details or {}).get("is_primary"))) for goal in remaining]
 
     async def approve_budget(self, user_id: str, budget_id: str) -> dict:
         budget = await self.db.scalar(

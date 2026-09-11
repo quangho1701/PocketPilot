@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import pytest
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.models import Base, FinancialMemory, MemoryType, User, UserProfile
 from app.services.budget_service import BudgetService
+from app.services.setup_service import FinancialSetupService
 from app.schemas.setup import FinancialSetupPayload
 
 
@@ -14,14 +17,14 @@ async def session_with_setup():
         await connection.run_sync(Base.metadata.create_all)
     session = async_sessionmaker(engine, expire_on_commit=False)()
     session.add(User(id="plan-user", email="plan@example.com", name="Plan"))
-    session.add(UserProfile(user_id="plan-user", monthly_income=10_000_000, income_frequency="monthly", savings_priority="balanced", currency="VND"))
+    session.add(UserProfile(user_id="plan-user", monthly_income=10_000_000, income_frequency="monthly", savings_priority="balanced", currency="USD", financial_setup_completed_at=datetime.now(UTC), financial_setup_version=1))
     session.add(FinancialMemory(user_id="plan-user", memory_type=MemoryType.GOAL, title="Japan Vacation", content="Save for Japan", amount=30_000_000, category="travel", details={"goal_type":"travel","target_amount":30_000_000,"current_amount":2_000_000,"target_date":"2027-03-01"}, source="financial_setup", source_id="primary_goal"))
     await session.flush()
     return session, engine
 
 
 def test_setup_contract_accepts_multiple_or_no_goals():
-    base = {"currency":"VND","monthly_income":10_000_000,"income_frequency":"monthly","recurring_expenses":[],"savings_priority":"balanced","focus_categories":[],"financial_situation_notes":None,"setup_version":1}
+    base = {"currency":"USD","monthly_income":10_000_000,"income_frequency":"monthly","recurring_expenses":[],"savings_priority":"balanced","focus_categories":[],"financial_situation_notes":None,"setup_version":1}
     empty = FinancialSetupPayload.model_validate({**base, "goals":[], "primary_goal_id":None})
     assert empty.primary_goal is None
     multiple = FinancialSetupPayload.model_validate({**base, "goals":[
@@ -42,8 +45,27 @@ async def test_draft_goal_confirmation_and_goal_management():
         assert len(confirmed) == 1
         assert await service.get_draft_goals("plan-user") == []
         added = await service.create_plan_goal("plan-user", {"name":"New Laptop","target_amount":20_000_000,"current_amount":0,"target_date":None,"goal_type":"other"})
-        changed = await service.update_plan_goal("plan-user", added["id"], {"target_amount":22_000_000})
+        changed = await service.update_plan_goal("plan-user", added["id"], {
+            "target_amount":22_000_000, "current_amount": 3_000_000,
+            "goal_type": "major_purchase", "is_primary": True,
+        })
         assert changed["target_amount"] == 22_000_000
+        assert changed["current_amount"] == 3_000_000
+        assert changed["goal_type"] == "major_purchase"
+        assert changed["is_primary"] is True
+        goals = await service.list_plan_goals("plan-user")
+        assert [goal["id"] for goal in goals if goal["is_primary"]] == [added["id"]]
+        setup = await FinancialSetupService(session).get_setup("plan-user")
+        assert setup.data is not None
+        assert setup.data.primary_goal_id == added["key"]
+
+        remaining = await service.delete_plan_goal("plan-user", added["id"])
+        assert len(remaining) == 1
+        assert remaining[0]["name"] == "Japan Vacation"
+        assert remaining[0]["is_primary"] is True
+
+        assert await service.delete_plan_goal("plan-user", remaining[0]["id"]) == []
+        assert await service.list_plan_goals("plan-user") == []
     finally:
         await session.close(); await engine.dispose()
 

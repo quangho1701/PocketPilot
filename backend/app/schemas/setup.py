@@ -45,7 +45,8 @@ class GoalSetup(BaseModel):
 class FinancialSetupPayload(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
-    currency: Literal["VND"]
+    # VND remains readable for existing profiles; all newly submitted app setup uses USD.
+    currency: Literal["USD", "VND"]
     monthly_income: PositiveVND
     income_frequency: Literal["weekly", "biweekly", "monthly"]
     recurring_expenses: list[RecurringExpenseSetup] = Field(

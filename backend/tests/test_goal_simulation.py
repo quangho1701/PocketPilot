@@ -205,7 +205,7 @@ class TestService:
             )
             assert result.goal.id == saved_goal.id
             assert result.baseline.monthly_contribution == 600
-            assert any("ngân sách đang hoạt động" in assumption for assumption in result.assumptions)
+            assert any("active budget" in assumption for assumption in result.assumptions)
         finally:
             await session.close()
             await engine.dispose()
@@ -334,7 +334,7 @@ class TestIntent:
             resolver = GoalSimulationIntentResolver(session)
             ambiguous = await resolver.resolve("user-1", "What if I spend 300?")
             deadline = await resolver.resolve("user-1", "Will I reach my goal by June if I spend 300?")
-            assert ambiguous is not None and ambiguous.clarification == "Bạn muốn mô phỏng mục tiêu nào?"
+            assert ambiguous is not None and ambiguous.clarification == "Which goal would you like to simulate?"
             assert deadline is not None and deadline.clarification is not None
         finally:
             await session.close()
@@ -377,7 +377,7 @@ class TestChat:
             await seed_goal(session, name="Laptop", target_amount=1500, current_amount=400)
             with patch("app.services.assistant_service.llm_client.invoke_model", new_callable=AsyncMock) as invoke_model:
                 clarification = await AssistantService(session).chat("user-1", ChatRequest(message="What if I spend 300?"))
-            assert clarification.message.content == "Bạn muốn mô phỏng mục tiêu nào?"
+            assert clarification.message.content == "Which goal would you like to simulate?"
             invoke_model.assert_not_awaited()
         finally:
             await session.close()
@@ -395,7 +395,7 @@ class TestChat:
             vague = await resolver.resolve("user-1", "What if I spend 300 on another goal?", previous_simulation_input=previous)
             assert explicit is not None and explicit.goal_id == laptop.id
             assert vague is not None and vague.goal_id is None
-            assert vague.clarification == "Bạn muốn mô phỏng mục tiêu nào?"
+            assert vague.clarification == "Which goal would you like to simulate?"
         finally:
             await session.close()
             await engine.dispose()
@@ -450,7 +450,7 @@ class TestCompletionRegressions:
                 "user-1", "Nếu chi 500 nghìn thì mục tiêu thay đổi thế nào?"
             )
             assert intent is not None
-            assert intent.clarification == "Chưa có mục tiêu tài chính đang hoạt động để mô phỏng."
+            assert intent.clarification == "There are no active financial goals to simulate."
         finally:
             await session.close()
             await engine.dispose()
@@ -470,7 +470,7 @@ class TestCompletionRegressions:
                     "user-1", ChatRequest(message="Nếu chi 500 nghìn thì mục tiêu thay đổi thế nào?")
                 )
             assert response.message.simulation_result is not None
-            assert response.message.content.startswith("Mình đã tính tác động")
+            assert response.message.content.startswith("I calculated the impact")
             await session.commit()
             messages = await AssistantService(session).get_messages("user-1", response.conversation_id)
             assert messages is not None

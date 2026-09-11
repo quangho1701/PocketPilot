@@ -173,6 +173,13 @@ class PlanGoalCreate(BaseModel):
     current_amount: float = Field(default=0, ge=0)
     target_date: Optional[str] = None
     goal_type: str = Field(default="other", max_length=100)
+    is_primary: bool = False
+
+    @model_validator(mode="after")
+    def _current_not_above_target(self):
+        if self.current_amount > self.target_amount:
+            raise ValueError("current_amount cannot exceed target_amount")
+        return self
 
 
 class PlanGoalUpdate(BaseModel):
@@ -181,6 +188,7 @@ class PlanGoalUpdate(BaseModel):
     current_amount: Optional[float] = Field(default=None, ge=0)
     target_date: Optional[str] = None
     goal_type: Optional[str] = Field(default=None, max_length=100)
+    is_primary: Optional[bool] = None
 
 
 class BudgetCategoryCreate(BaseModel):

@@ -99,3 +99,6 @@ export async function createPlanGoal(goal: PlanGoalInput): Promise<PlanGoal> {
 export async function updatePlanGoal(id: string, goal: Partial<PlanGoalInput>): Promise<PlanGoal> {
   return (await api.patch<PlanGoal>(`${BUDGET_ENDPOINT}/plan-goals/${id}`, goal, { params: { user_id: DEMO_USER_ID } })).data;
 }
+export async function deletePlanGoal(id: string): Promise<PlanGoal[]> {
+  return (await api.delete<PlanGoal[]>(`${BUDGET_ENDPOINT}/plan-goals/${id}`, { params: { user_id: DEMO_USER_ID } })).data;
+}

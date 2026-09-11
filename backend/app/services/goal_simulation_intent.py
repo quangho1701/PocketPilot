@@ -78,7 +78,7 @@ class GoalSimulationIntentResolver:
 
         goals = await self._get_active_goals(user_id)
         goal_id, goal_clarification = self._resolve_goal(message, goals)
-        if previous_request and not _GOAL_CHANGE_PATTERN.search(message) and goal_id is None and goal_clarification == "Bạn muốn mô phỏng mục tiêu nào?":
+        if previous_request and not _GOAL_CHANGE_PATTERN.search(message) and goal_id is None and goal_clarification == "Which goal would you like to simulate?":
             goal_id = previous_request.target_goal_id
             goal_clarification = None
         return GoalSimulationIntent(
@@ -99,12 +99,12 @@ class GoalSimulationIntentResolver:
         amount_match = _AMOUNT_PATTERN.search(amount_message)
         if not amount_match:
             if _SAVINGS_PATTERN.search(message) or _EXPENSE_PATTERN.search(message):
-                return None, None, "Bạn muốn mô phỏng số tiền bao nhiêu?"
+                return None, None, "What amount would you like to simulate?"
             return None, None, None
 
         amount = self._parse_amount(amount_match.group(1), amount_match.group(2))
         if re.search(r"\bby\s+\w+\b", message, re.IGNORECASE) and deadline is None:
-            return None, None, "Vui lòng nhập thời hạn cụ thể, ví dụ 2027-06-30."
+            return None, None, "Please enter a specific deadline, such as 2027-06-30."
 
         recurring_match = _RECURRING_PATTERN.search(message)
         if _SAVINGS_PATTERN.search(message):
@@ -204,9 +204,9 @@ class GoalSimulationIntentResolver:
         if len(matches) == 1:
             return matches[0].id, None
         if len(matches) > 1:
-            return None, "Bạn muốn mô phỏng mục tiêu nào?"
+            return None, "Which goal would you like to simulate?"
         if len(goals) == 1:
             return goals[0].id, None
         if not goals:
-            return None, "Chưa có mục tiêu tài chính đang hoạt động để mô phỏng."
-        return None, "Bạn muốn mô phỏng mục tiêu nào?"
+            return None, "There are no active financial goals to simulate."
+        return None, "Which goal would you like to simulate?"

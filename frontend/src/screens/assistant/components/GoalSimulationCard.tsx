@@ -2,7 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { GoalSimulationResult, ProjectionStatus } from '@/types';
 import { COLORS, FONTS } from '@/theme';
-import { formatCompactVnd, formatMonthYear, formatVnd } from '@/utils/finance';
+import { formatCompactUsd, formatMonthYear, formatUsd } from '@/utils/finance';
 
 interface Props {
   result: GoalSimulationResult;
@@ -11,50 +11,50 @@ interface Props {
 type StatusTone = 'safe' | 'warning' | 'danger' | 'neutral';
 
 const STATUS_DETAILS: Record<ProjectionStatus, { label: string; tone: StatusTone }> = {
-  projected: { label: 'ĐÃ ƯỚC TÍNH', tone: 'safe' },
-  completed: { label: 'ĐÃ HOÀN THÀNH', tone: 'safe' },
-  insufficient_plan: { label: 'CHƯA ĐỦ KẾ HOẠCH', tone: 'warning' },
-  unreachable: { label: 'CHƯA THỂ ĐẠT', tone: 'danger' },
-  deadline_passed: { label: 'ĐÃ QUA HẠN', tone: 'danger' },
-  unsupported_horizon: { label: 'VƯỢT KỲ HẠN', tone: 'warning' },
-  unsupported: { label: 'CHƯA HỖ TRỢ', tone: 'neutral' },
+  projected: { label: 'PROJECTED', tone: 'safe' },
+  completed: { label: 'COMPLETED', tone: 'safe' },
+  insufficient_plan: { label: 'INSUFFICIENT PLAN', tone: 'warning' },
+  unreachable: { label: 'UNREACHABLE', tone: 'danger' },
+  deadline_passed: { label: 'DEADLINE PASSED', tone: 'danger' },
+  unsupported_horizon: { label: 'BEYOND HORIZON', tone: 'warning' },
+  unsupported: { label: 'UNSUPPORTED', tone: 'neutral' },
 };
 
 function scenarioSummary(result: GoalSimulationResult): string {
   const { scenario } = result;
   if (scenario.scenario_type === 'one_time_expense') {
-    return `Chi thêm một lần ${formatVnd(scenario.amount)}`;
+    return `One-time additional expense of ${formatUsd(scenario.amount)}`;
   }
   if (scenario.scenario_type === 'recurring_expense') {
-    const cadence = scenario.frequency === 'weekly' ? 'mỗi tuần' : 'mỗi tháng';
-    return `Chi thêm ${formatVnd(scenario.amount)} ${cadence}`;
+    const cadence = scenario.frequency === 'weekly' ? 'per week' : 'per month';
+    return `Additional expense of ${formatUsd(scenario.amount)} ${cadence}`;
   }
-  return `Để dành thêm ${formatVnd(scenario.amount)} mỗi tháng`;
+  return `Save an additional ${formatUsd(scenario.amount)} per month`;
 }
 
 function projectionLabel(status: ProjectionStatus, completionDate: string | null): string {
   const month = formatMonthYear(completionDate);
   if (month) return month;
-  if (status === 'completed') return 'Đã hoàn thành';
-  if (status === 'insufficient_plan') return 'Chưa có khoản để dành';
-  if (status === 'unsupported_horizon') return 'Ngoài kỳ hạn ước tính';
-  if (status === 'deadline_passed') return 'Đã qua thời hạn';
-  return 'Chưa thể ước tính';
+  if (status === 'completed') return 'Completed';
+  if (status === 'insufficient_plan') return 'No planned contribution';
+  if (status === 'unsupported_horizon') return 'Beyond projection horizon';
+  if (status === 'deadline_passed') return 'Deadline passed';
+  return 'Cannot project';
 }
 
 function impactLabel(result: GoalSimulationResult): string {
   const { impact, status } = result;
   if (impact.delay_months > 0) {
-    return `Chậm hơn khoảng ${impact.delay_months} tháng`;
+    return `About ${impact.delay_months} months later`;
   }
   if (impact.acceleration_months > 0) {
-    return `Sớm hơn khoảng ${impact.acceleration_months} tháng`;
+    return `About ${impact.acceleration_months} months sooner`;
   }
   if (status === 'unsupported_horizon' || status === 'unreachable') {
-    return 'Mục tiêu có thể chưa đạt trong kỳ hạn ước tính';
+    return 'The goal may not be reached within the projection horizon';
   }
-  if (status === 'insufficient_plan') return 'Cần một khoản để dành hàng tháng';
-  return 'Không thay đổi thời điểm dự kiến';
+  if (status === 'insufficient_plan') return 'A monthly contribution is required';
+  return 'No change to the projected completion date';
 }
 
 function trajectoryBars(result: GoalSimulationResult) {
@@ -79,18 +79,18 @@ export default function GoalSimulationCard({ result }: Props) {
   };
   const iconColor = details.tone === 'danger' ? COLORS.error : details.tone === 'warning' ? COLORS.amber : COLORS.teal;
   const graphSummary = bars.length
-    ? `Đường tiến độ mô phỏng có ${bars.length} mốc, kết thúc ở ${formatCompactVnd(bars[bars.length - 1].amount)}.`
-    : 'Chưa có dữ liệu tiến độ mô phỏng.';
+    ? `The simulated trajectory has ${bars.length} points and ends at ${formatCompactUsd(bars[bars.length - 1].amount)}.`
+    : 'No simulated trajectory data is available.';
 
   return (
-    <View style={styles.card} accessibilityLabel={`Mô phỏng mục tiêu ${result.goal.title}. ${impactLabel(result)}. ${graphSummary}`}>
+    <View style={styles.card} accessibilityLabel={`Goal simulation for ${result.goal.title}. ${impactLabel(result)}. ${graphSummary}`}>
       <View style={styles.header}>
         <View style={styles.goalIdentity}>
           <View style={[styles.goalIcon, toneStyles[details.tone]]}>
             <Ionicons name="flag-outline" size={17} color={iconColor} />
           </View>
           <View style={styles.goalCopy}>
-            <Text style={styles.eyebrow}>MÔ PHỎNG MỤC TIÊU</Text>
+            <Text style={styles.eyebrow}>GOAL SIMULATION</Text>
             <Text style={styles.goalTitle} numberOfLines={2}>{result.goal.title}</Text>
           </View>
         </View>
@@ -106,15 +106,15 @@ export default function GoalSimulationCard({ result }: Props) {
 
       <View style={styles.projectionGrid}>
         <View style={styles.projectionColumn}>
-          <Text style={styles.projectionLabel}>KẾ HOẠCH HIỆN TẠI</Text>
+          <Text style={styles.projectionLabel}>CURRENT PLAN</Text>
           <Text style={styles.projectionValue}>{projectionLabel(result.baseline.status, result.baseline.projected_completion_date)}</Text>
-          <Text style={styles.contributionText}>{formatCompactVnd(result.baseline.monthly_contribution)}/tháng</Text>
+          <Text style={styles.contributionText}>{formatCompactUsd(result.baseline.monthly_contribution)}/month</Text>
         </View>
         <View style={styles.projectionDivider} />
         <View style={styles.projectionColumn}>
-          <Text style={styles.projectionLabel}>VỚI THAY ĐỔI</Text>
+          <Text style={styles.projectionLabel}>WITH CHANGE</Text>
           <Text style={styles.projectionValue}>{projectionLabel(result.scenario.status, result.scenario.projected_completion_date)}</Text>
-          <Text style={styles.contributionText}>{formatCompactVnd(result.scenario.monthly_contribution)}/tháng</Text>
+          <Text style={styles.contributionText}>{formatCompactUsd(result.scenario.monthly_contribution)}/month</Text>
         </View>
       </View>
 
@@ -126,8 +126,8 @@ export default function GoalSimulationCard({ result }: Props) {
       {bars.length ? (
         <View style={styles.trajectorySection} accessible accessibilityLabel={graphSummary}>
           <View style={styles.trajectoryHeader}>
-            <Text style={styles.trajectoryLabel}>TIẾN ĐỘ THEO MÔ PHỎNG</Text>
-            <Text style={styles.trajectoryTarget}>Đích {formatCompactVnd(result.goal.target_amount)}</Text>
+            <Text style={styles.trajectoryLabel}>SIMULATED TRAJECTORY</Text>
+            <Text style={styles.trajectoryTarget}>Target {formatCompactUsd(result.goal.target_amount)}</Text>
           </View>
           <View style={styles.chart}>
             <View style={styles.targetRule} />
@@ -149,19 +149,19 @@ export default function GoalSimulationCard({ result }: Props) {
           <Ionicons name={assessment.achievable ? 'checkmark-circle-outline' : 'calendar-outline'} size={16} color={assessment.achievable ? COLORS.success : COLORS.amber} />
           <View style={styles.deadlineCopy}>
             <Text style={styles.deadlineTitle}>
-              {assessment.achievable ? 'Vẫn đúng tiến độ mục tiêu' : `Còn thiếu ${formatCompactVnd(assessment.shortfall)} vào hạn`}
+              {assessment.achievable ? 'Goal remains on track' : `${formatCompactUsd(assessment.shortfall)} short at the deadline`}
             </Text>
             <Text style={styles.deadlineMeta}>
-              Hạn {formatMonthYear(assessment.deadline) ?? assessment.deadline}
+              Deadline {formatMonthYear(assessment.deadline) ?? assessment.deadline}
               {assessment.required_additional_monthly_savings != null
-                ? ` · Cần thêm ${formatCompactVnd(assessment.required_additional_monthly_savings)}/tháng`
+                ? ` · Requires ${formatCompactUsd(assessment.required_additional_monthly_savings)} more per month`
                 : ''}
             </Text>
           </View>
         </View>
       ) : null}
 
-      {result.assumptions.length ? <View style={styles.assumptions}><Text style={styles.assumptionsLabel}>GIẢ ĐỊNH</Text>{result.assumptions.map((assumption) => <Text key={assumption} style={styles.assumption}>• {assumption}</Text>)}</View> : null}
+      {result.assumptions.length ? <View style={styles.assumptions}><Text style={styles.assumptionsLabel}>ASSUMPTIONS</Text>{result.assumptions.map((assumption) => <Text key={assumption} style={styles.assumption}>• {assumption}</Text>)}</View> : null}
       {result.warnings.map((warning) => (
         <View key={warning} style={styles.warningRow}>
           <Ionicons name="warning-outline" size={15} color={COLORS.amber} />

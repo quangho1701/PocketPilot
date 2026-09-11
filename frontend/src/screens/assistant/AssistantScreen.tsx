@@ -29,30 +29,30 @@ import MessageBubble from './components/MessageBubble';
 const STARTER_PROMPTS = [
   {
     icon: 'headset-outline' as const,
-    label: 'Tai nghe 1,2 triệu có ổn không?',
-    prompt: 'Mình định mua tai nghe 1.200.000 ₫ hôm nay, có ổn không?',
+    label: 'Can I afford $120 headphones?',
+    prompt: 'Can I afford to spend $120 on headphones today?',
   },
   {
     icon: 'wallet-outline' as const,
-    label: 'Tuần này mình còn chi được bao nhiêu?',
-    prompt: 'Tuần này mình còn có thể chi linh hoạt bao nhiêu?',
+    label: 'How much can I spend this week?',
+    prompt: 'How much flexible spending do I have left this week?',
   },
   {
     icon: 'flag-outline' as const,
-    label: 'Chi thêm có ảnh hưởng mục tiêu không?',
-    prompt: 'Nếu mình chi thêm 500.000 ₫ thì mục tiêu của mình thay đổi thế nào?',
+    label: 'How would spending affect a goal?',
+    prompt: 'How would an additional $50 expense affect one of my goals?',
   },
   {
     icon: 'trending-up-outline' as const,
-    label: 'Nếu để dành thêm mỗi tháng?',
-    prompt: 'Nếu mình để dành thêm 200.000 ₫ mỗi tháng thì mục tiêu thay đổi thế nào?',
+    label: 'What if I save more each month?',
+    prompt: 'How would saving an additional $25 per month change one of my goals?',
   },
 ];
 
 const CONTEXT_SIGNALS = [
-  { icon: 'wallet-outline' as const, label: 'Ngân sách' },
-  { icon: 'calendar-clear-outline' as const, label: 'Khoản sắp tới' },
-  { icon: 'flag-outline' as const, label: 'Mục tiêu' },
+  { icon: 'wallet-outline' as const, label: 'Budget' },
+  { icon: 'calendar-clear-outline' as const, label: 'Upcoming expenses' },
+  { icon: 'flag-outline' as const, label: 'Goals' },
 ];
 
 type Decision = 'buy' | 'wait' | 'skip';
@@ -123,7 +123,7 @@ export default function AssistantScreen() {
       setConversationId(response.conversation_id);
       setMessages((previous) => [...previous, response.message]);
     } catch {
-      setError('Chưa thể kết nối với cố vấn. Nội dung của bạn vẫn được giữ lại.');
+      setError('Could not connect to the assistant. Your message has been preserved.');
       setMessages((previous) => previous.filter((message) => message.id !== optimistic.id));
       setInput(text);
     } finally {
@@ -156,7 +156,7 @@ export default function AssistantScreen() {
         );
         setRecordedDecisions((previous) => ({ ...previous, [messageId]: decision }));
       } catch {
-        setError('Chưa ghi nhận được quyết định. Hãy thử lại sau một chút.');
+        setError('Could not record your decision. Please try again.');
       } finally {
         setSubmittingDecision(null);
       }
@@ -178,13 +178,13 @@ export default function AssistantScreen() {
             <Ionicons name="sparkles" size={20} color={COLORS.teal} />
           </View>
           <View style={styles.headerCopy}>
-            <Text style={styles.headerTitle}>Cố vấn chi tiêu</Text>
+            <Text style={styles.headerTitle}>Spending Assistant</Text>
             <View style={styles.statusRow}>
               <View style={[styles.statusDot, historySyncError && styles.statusDotWarning]} />
               <Text style={styles.statusText} numberOfLines={1}>
                 {historySyncError
-                  ? 'PocketPilot · chưa đồng bộ lịch sử'
-                  : 'PocketPilot · sẵn sàng phân tích'}
+                  ? 'PocketPilot · history not synced'
+                  : 'PocketPilot · ready to analyze'}
               </Text>
             </View>
           </View>
@@ -197,7 +197,7 @@ export default function AssistantScreen() {
               (thinking || loadingHistory) && styles.newChatButtonDisabled,
             ]}
             accessibilityRole="button"
-            accessibilityLabel="Bắt đầu cuộc trò chuyện mới"
+            accessibilityLabel="Start a new conversation"
           >
             <Ionicons name="create-outline" size={19} color={COLORS.textSecondary} />
           </Pressable>
@@ -210,7 +210,7 @@ export default function AssistantScreen() {
             </View>
             <View style={styles.historyLoadingBubble}>
               <ActivityIndicator size="small" color={COLORS.teal} />
-              <Text style={styles.historyLoadingText}>Đang mở cuộc trò chuyện…</Text>
+              <Text style={styles.historyLoadingText}>Opening conversation…</Text>
             </View>
           </View>
         ) : messages.length === 0 && !thinking ? (
@@ -221,7 +221,7 @@ export default function AssistantScreen() {
           >
             <View style={styles.dateDivider}>
               <View style={styles.dateDividerLine} />
-              <Text style={styles.dateDividerText}>Hôm nay</Text>
+              <Text style={styles.dateDividerText}>Today</Text>
               <View style={styles.dateDividerLine} />
             </View>
 
@@ -232,13 +232,13 @@ export default function AssistantScreen() {
               <View style={styles.welcomeColumn}>
                 <View style={styles.senderRow}>
                   <Text style={styles.senderName}>PocketPilot</Text>
-                  <Text style={styles.senderTime}>Bây giờ</Text>
+                  <Text style={styles.senderTime}>Now</Text>
                 </View>
                 <View style={styles.welcomeBubble}>
-                  <Text style={styles.welcomeTitle}>Chào bạn 👋</Text>
+                  <Text style={styles.welcomeTitle}>Hello 👋</Text>
                   <Text style={styles.welcomeText}>
-                    Bạn đang cân nhắc khoản chi hoặc mục tiêu nào? Gửi mình tình huống và số tiền,
-                    mình sẽ giúp bạn xem tác động trước khi quyết định.
+                    What purchase or goal are you considering? Share the situation and amount,
+                    and I’ll help you understand the impact before you decide.
                   </Text>
                   <View style={styles.signalList}>
                     {CONTEXT_SIGNALS.map((signal) => (
@@ -252,9 +252,9 @@ export default function AssistantScreen() {
                 <View style={styles.memoryNote}>
                   <Ionicons name="shield-checkmark" size={17} color={COLORS.teal} />
                   <View style={styles.memoryCopy}>
-                    <Text style={styles.memoryTitle}>Tư vấn theo hồ sơ của bạn</Text>
+                    <Text style={styles.memoryTitle}>Advice based on your profile</Text>
                     <Text style={styles.memoryText} numberOfLines={2}>
-                      Mình sẽ đối chiếu ngân sách, khoản sắp tới và mục tiêu đã lưu.
+                      I’ll compare your budget, upcoming expenses, and saved goals.
                     </Text>
                   </View>
                 </View>
@@ -263,8 +263,8 @@ export default function AssistantScreen() {
 
             <View style={styles.quickReplyBlock}>
               <View style={styles.quickReplyHeader}>
-                <Text style={styles.quickReplyTitle}>Bạn có thể hỏi</Text>
-                <Text style={styles.quickReplyMeta}>Chạm để gửi</Text>
+                <Text style={styles.quickReplyTitle}>Try asking</Text>
+                <Text style={styles.quickReplyMeta}>Tap to send</Text>
               </View>
               {STARTER_PROMPTS.map((item) => (
                 <Pressable
@@ -275,7 +275,7 @@ export default function AssistantScreen() {
                     pressed && styles.quickReplyPressed,
                   ]}
                   accessibilityRole="button"
-                  accessibilityLabel={`Gửi câu hỏi: ${item.label}`}
+                  accessibilityLabel={`Send question: ${item.label}`}
                 >
                   <View style={styles.quickReplyIcon}>
                     <Ionicons name={item.icon} size={16} color={COLORS.teal} />
@@ -311,7 +311,7 @@ export default function AssistantScreen() {
                   <View style={styles.thinkingBubble}>
                     <ActivityIndicator size="small" color={COLORS.teal} />
                     <Text style={styles.thinkingText}>
-                      Đang đối chiếu ngân sách và mục tiêu…
+                      Comparing your budget and goals…
                     </Text>
                   </View>
                 </View>
@@ -325,7 +325,7 @@ export default function AssistantScreen() {
             onPress={() => setError(null)}
             style={styles.errorBanner}
             accessibilityRole="button"
-            accessibilityLabel={`${error}. Chạm để đóng thông báo.`}
+            accessibilityLabel={`${error}. Tap to dismiss.`}
             accessibilityLiveRegion="assertive"
           >
             <Ionicons name="alert-circle-outline" size={18} color={COLORS.error} />
@@ -340,14 +340,14 @@ export default function AssistantScreen() {
               style={styles.input}
               value={input}
               onChangeText={setInput}
-              placeholder="Hỏi về khoản chi hoặc mục tiêu…"
+              placeholder="Ask about spending or a goal…"
               placeholderTextColor={COLORS.textMuted}
               selectionColor={COLORS.teal}
               multiline
               maxLength={1000}
               editable={!thinking && !loadingHistory}
-              accessibilityLabel="Câu hỏi cho cố vấn tài chính"
-              accessibilityHint="Ví dụ: Chi thêm 500 nghìn ảnh hưởng mục tiêu thế nào?"
+              accessibilityLabel="Question for the financial assistant"
+              accessibilityHint="For example: How would spending $50 affect my goal?"
             />
             <Pressable
               style={({ pressed }) => [
@@ -362,7 +362,7 @@ export default function AssistantScreen() {
               onPress={handleSend}
               disabled={!input.trim() || thinking || loadingHistory}
               accessibilityRole="button"
-              accessibilityLabel="Gửi câu hỏi"
+              accessibilityLabel="Send question"
             >
               {thinking ? (
                 <ActivityIndicator size="small" color={COLORS.surface} />
@@ -373,8 +373,8 @@ export default function AssistantScreen() {
           </View>
           <Text style={styles.composerHint}>
             {loadingHistory
-              ? 'Đang đồng bộ cuộc trò chuyện…'
-              : 'AI có thể sai — hãy kiểm tra trước quyết định lớn.'}
+              ? 'Syncing conversation…'
+              : 'AI can make mistakes — verify before major decisions.'}
           </Text>
         </View>
       </KeyboardAvoidingView>

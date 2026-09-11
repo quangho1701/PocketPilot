@@ -31,6 +31,13 @@ class FinancialSetupService:
             )
 
         memories = await self._get_active_setup_memories(user_id)
+        plan_goals = list((await self.db.execute(select(FinancialMemory).where(
+            FinancialMemory.user_id == user_id,
+            FinancialMemory.source == "plan",
+            FinancialMemory.memory_type == MemoryType.GOAL,
+            FinancialMemory.is_deleted == False,  # noqa: E712
+        ))).scalars().all())
+        memories.extend(plan_goals)
         payload = self._reconstruct_payload(profile, memories)
         return FinancialSetupResponse(
             status="completed",
@@ -134,7 +141,7 @@ class FinancialSetupService:
                 title="Thu nhập thực nhận hàng tháng",
                 content=(
                     f"Thu nhập thực nhận trung bình là "
-                    f"{data.monthly_income:,} VND mỗi tháng."
+                    f"${data.monthly_income:,.2f} per month."
                 ),
                 amount=data.monthly_income,
                 category="income",
@@ -150,7 +157,7 @@ class FinancialSetupService:
             goal_details = goal.model_dump(mode="json")
             goal_details.update({"id": goal_id, "currency": data.currency, "position": position, "is_primary": goal_id == data.primary_goal_id})
             memories.append(FinancialMemory(user_id=user_id, memory_type=MemoryType.GOAL, title=goal.name,
-                content=f"Mục tiêu tài chính là {goal.name}, cần {goal.target_amount:,} VND.",
+                content=f"Financial goal: {goal.name}, target ${goal.target_amount:,.2f}.",
                 amount=goal.target_amount, category=goal.goal_type, details=goal_details,
                 importance=MemoryImportance.HIGH, source=self.SOURCE, source_id=f"goal:{goal_id}"))
 
@@ -169,7 +176,7 @@ class FinancialSetupService:
                     title=expense.name,
                     content=(
                         f"Chi phí cố định {expense.name} khoảng "
-                        f"{expense.monthly_amount:,} VND mỗi tháng."
+                        f"${expense.monthly_amount:,.2f} per month."
                     ),
                     amount=expense.monthly_amount,
                     category=expense.category,
@@ -217,8 +224,9 @@ class FinancialSetupService:
             details = memory.details or {}
             goal_id = details.get("id") or (memory.source_id or f"goal-{position + 1}").removeprefix("goal:")
             goals.append({"id": goal_id, "goal_type": details.get("goal_type", memory.category), "name": details.get("name", memory.title),
-                          "target_amount": details.get("target_amount", memory.amount), "current_amount": details.get("current_amount", 0), "target_date": details.get("target_date")})
-            if details.get("is_primary") or memory.source_id == "primary_goal": primary_goal_id = goal_id
+                          "target_amount": int(details.get("target_amount", memory.amount) or 0), "current_amount": int(details.get("current_amount", 0) or 0), "target_date": details.get("target_date")})
+            is_primary = bool(details["is_primary"]) if "is_primary" in details else memory.source_id == "primary_goal"
+            if is_primary: primary_goal_id = goal_id
         spending_categories = profile.spending_categories or {}
         focus_categories = spending_categories.get("focus_categories", [])
         if not isinstance(focus_categories, list):

@@ -177,7 +177,10 @@ async def list_plan_goals(user_id: str, db: AsyncSession = Depends(get_db)):
 
 @router.post("/plan-goals", response_model=PlanGoalResponse, status_code=status.HTTP_201_CREATED)
 async def create_plan_goal(user_id: str, data: PlanGoalCreate, db: AsyncSession = Depends(get_db)):
-    result = await BudgetService(db).create_plan_goal(user_id, data.model_dump())
+    try:
+        result = await BudgetService(db).create_plan_goal(user_id, data.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     await db.commit()
     return result
 
@@ -186,6 +189,17 @@ async def create_plan_goal(user_id: str, data: PlanGoalCreate, db: AsyncSession 
 async def update_plan_goal(goal_id: str, user_id: str, data: PlanGoalUpdate, db: AsyncSession = Depends(get_db)):
     try:
         result = await BudgetService(db).update_plan_goal(user_id, goal_id, data.model_dump(exclude_unset=True))
+    except ValueError as exc:
+        status_code = 404 if str(exc) == "goal not found" else 400
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+    await db.commit()
+    return result
+
+
+@router.delete("/plan-goals/{goal_id}", response_model=list[PlanGoalResponse])
+async def delete_plan_goal(goal_id: str, user_id: str, db: AsyncSession = Depends(get_db)):
+    try:
+        result = await BudgetService(db).delete_plan_goal(user_id, goal_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     await db.commit()
