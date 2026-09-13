@@ -9,7 +9,7 @@ An AI-powered financial coach with persistent memory that provides proactive, pe
 | Frontend | React Native (Expo) |
 | Backend | Python (FastAPI) |
 | Database | CockroachDB (Postgres-compatible) |
-| AI/LLM | Amazon Bedrock (Bedrock Agents) |
+| AI/LLM | Google Gemini (default), Amazon Bedrock (optional) |
 | Vector Store | CockroachDB Distributed Vector Indexing |
 | Deployment | Docker, AWS Lambda / ECS Fargate |
 
@@ -64,7 +64,7 @@ git clone <repo-url>
 cd PocketPilot
 cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env
-# Fill in your AWS credentials and DB URL in backend/.env
+# Fill in GEMINI_API_KEY and the DB URL in backend/.env
 ```
 
 ### 2. Start the database

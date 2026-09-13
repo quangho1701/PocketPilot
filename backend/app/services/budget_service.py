@@ -22,7 +22,7 @@ from app.services.budget_strategies import (
     FiftyThirtyTwentyStrategy,
     ZeroBasedStrategy,
 )
-from app.utils.bedrock import bedrock_client
+from app.utils.llm import llm_client
 
 logger = logging.getLogger(__name__)
 
@@ -430,7 +430,7 @@ class BudgetService:
     ) -> dict:
         prompt = self._build_ai_prompt(context, selected_mode=selected_mode, initial_only=initial_only)
         try:
-            raw = await bedrock_client.invoke_with_prompt(prompt, temperature=0.2)
+            raw = await llm_client.invoke_with_prompt(prompt, temperature=0.2)
             parsed = self._parse_ai_response(raw)
             if parsed:
                 parsed["user_id"] = user_id

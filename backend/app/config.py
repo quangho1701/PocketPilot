@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -7,10 +9,10 @@ class Settings(BaseSettings):
     database_url: str = "cockroachdb+asyncpg://root@localhost:26257/pocketpilot?sslmode=disable"
     allowed_origins: str = "http://localhost:19006,http://localhost:8081"
 
-    # LLM provider: "bedrock" (default, required for hackathon submission) or "gemini" (free-tier dev)
-    llm_provider: str = "bedrock"
+    # Gemini is the application default; Bedrock remains available as an explicit override.
+    llm_provider: Literal["gemini", "bedrock"] = "gemini"
     gemini_api_key: str = ""
-    gemini_model_id: str = "gemini-3.5-flash"
+    gemini_model_id: str = "gemini-2.5-flash"
     gemini_embedding_model_id: str = "gemini-embedding-001"
 
     aws_region: str = "us-east-1"
