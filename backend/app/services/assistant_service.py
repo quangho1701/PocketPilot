@@ -33,7 +33,8 @@ whether to buy things, grounded in their real financial situation below.
 {context_block}
 
 INSTRUCTIONS:
-- Every user-facing string in the JSON response must be natural Vietnamese.
+- Every user-facing string in the JSON response must be natural English.
+- Treat every monetary amount as USD and use the $ symbol when mentioning it.
 - If the user is asking about a specific purchase, give a clear buy/wait/skip verdict grounded in their \
 budget, upcoming expenses, and past behavior.
 - If the user is asking a general question (not a specific purchase), answer helpfully and set \
@@ -51,7 +52,8 @@ SIMULATION RESULT (source of truth):
 {simulation_result}
 
 INSTRUCTIONS:
-- Write the conversational explanation in natural Vietnamese.
+- Write the conversational explanation in natural English.
+- Treat every monetary amount as USD and use the $ symbol when mentioning it.
 - Explain only values present in the simulation result. Do not calculate, change, or invent monetary amounts, dates, or feasibility.
 - State the relevant assumption or warning concisely when present.
 - Respond with JSON ONLY — no markdown fences, no text outside the JSON object:
@@ -104,13 +106,13 @@ class AssistantService:
                 )
             except ValueError as exc:
                 error_messages = {
-                    "active budget not found for the current month": "Chưa có ngân sách đang hoạt động cho tháng này. Hãy phê duyệt kế hoạch trước khi mô phỏng.",
-                    "active goal not found": "Không tìm thấy mục tiêu tài chính đang hoạt động.",
-                    "goal is not active": "Mục tiêu này không còn ở trạng thái hoạt động.",
+                    "active budget not found for the current month": "There is no active budget for this month. Approve a plan before running a simulation.",
+                    "active goal not found": "No active financial goal was found.",
+                    "goal is not active": "This goal is no longer active.",
                 }
                 return await self._store_assistant_message(
                     conversation.id,
-                    {"reply": error_messages.get(str(exc), "Chưa thể thực hiện mô phỏng lúc này. Vui lòng kiểm tra dữ liệu và thử lại.")},
+                    {"reply": error_messages.get(str(exc), "The simulation could not be completed. Check your data and try again.")},
                 )
 
             history = await self._build_message_history(conversation.id)
@@ -226,7 +228,7 @@ class AssistantService:
         except Exception as exc:
             logger.exception("Simulation explanation invocation failed")
             return {
-                "reply": "Mình đã tính tác động dựa trên ngân sách đang hoạt động. Chi tiết mô phỏng nằm trong thẻ bên dưới.",
+                "reply": "I calculated the impact using your active budget. The simulation details are shown below.",
                 "recommendation": None,
                 "reasoning": None,
                 "item_description": None,

@@ -31,6 +31,13 @@ class FinancialSetupService:
             )
 
         memories = await self._get_active_setup_memories(user_id)
+        plan_goals = list((await self.db.execute(select(FinancialMemory).where(
+            FinancialMemory.user_id == user_id,
+            FinancialMemory.source == "plan",
+            FinancialMemory.memory_type == MemoryType.GOAL,
+            FinancialMemory.is_deleted == False,  # noqa: E712
+        ))).scalars().all())
+        memories.extend(plan_goals)
         payload = self._reconstruct_payload(profile, memories)
         return FinancialSetupResponse(
             status="completed",
@@ -134,7 +141,7 @@ class FinancialSetupService:
                 title="Thu nhập thực nhận hàng tháng",
                 content=(
                     f"Thu nhập thực nhận trung bình là "
-                    f"{data.monthly_income:,} VND mỗi tháng."
+                    f"${data.monthly_income:,.2f} per month."
                 ),
                 amount=data.monthly_income,
                 category="income",
@@ -145,25 +152,14 @@ class FinancialSetupService:
             )
         ]
 
-        goal_details = data.primary_goal.model_dump(mode="json")
-        goal_details["currency"] = data.currency
-        memories.append(
-            FinancialMemory(
-                user_id=user_id,
-                memory_type=MemoryType.GOAL,
-                title=data.primary_goal.name,
-                content=(
-                    f"Mục tiêu tài chính chính là {data.primary_goal.name}, "
-                    f"cần {data.primary_goal.target_amount:,} VND."
-                ),
-                amount=data.primary_goal.target_amount,
-                category=data.primary_goal.goal_type,
-                details=goal_details,
-                importance=MemoryImportance.HIGH,
-                source=self.SOURCE,
-                source_id="primary_goal",
-            )
-        )
+        for position, goal in enumerate(data.goals):
+            goal_id = goal.id or f"goal-{position + 1}"
+            goal_details = goal.model_dump(mode="json")
+            goal_details.update({"id": goal_id, "currency": data.currency, "position": position, "is_primary": goal_id == data.primary_goal_id})
+            memories.append(FinancialMemory(user_id=user_id, memory_type=MemoryType.GOAL, title=goal.name,
+                content=f"Financial goal: {goal.name}, target ${goal.target_amount:,.2f}.",
+                amount=goal.target_amount, category=goal.goal_type, details=goal_details,
+                importance=MemoryImportance.HIGH, source=self.SOURCE, source_id=f"goal:{goal_id}"))
 
         for position, expense in enumerate(data.recurring_expenses):
             expense_details = expense.model_dump(mode="json")
@@ -180,7 +176,7 @@ class FinancialSetupService:
                     title=expense.name,
                     content=(
                         f"Chi phí cố định {expense.name} khoảng "
-                        f"{expense.monthly_amount:,} VND mỗi tháng."
+                        f"${expense.monthly_amount:,.2f} per month."
                     ),
                     amount=expense.monthly_amount,
                     category=expense.category,
@@ -196,15 +192,10 @@ class FinancialSetupService:
     def _reconstruct_payload(
         self, profile: UserProfile, memories: list[FinancialMemory]
     ) -> FinancialSetupPayload:
-        goal_memory = next(
-            (memory for memory in memories if memory.memory_type == MemoryType.GOAL),
-            None,
-        )
+        goal_memories = sorted((memory for memory in memories if memory.memory_type == MemoryType.GOAL), key=lambda memory: (memory.details or {}).get("position", 0))
         if (
             profile.monthly_income is None
             or profile.income_frequency is None
-            or goal_memory is None
-            or not goal_memory.details
         ):
             raise RuntimeError("Completed financial setup data is incomplete")
 
@@ -227,7 +218,15 @@ class FinancialSetupService:
                 }
             )
 
-        goal_details = goal_memory.details or {}
+        goals = []
+        primary_goal_id = None
+        for position, memory in enumerate(goal_memories):
+            details = memory.details or {}
+            goal_id = details.get("id") or (memory.source_id or f"goal-{position + 1}").removeprefix("goal:")
+            goals.append({"id": goal_id, "goal_type": details.get("goal_type", memory.category), "name": details.get("name", memory.title),
+                          "target_amount": int(details.get("target_amount", memory.amount) or 0), "current_amount": int(details.get("current_amount", 0) or 0), "target_date": details.get("target_date")})
+            is_primary = bool(details["is_primary"]) if "is_primary" in details else memory.source_id == "primary_goal"
+            if is_primary: primary_goal_id = goal_id
         spending_categories = profile.spending_categories or {}
         focus_categories = spending_categories.get("focus_categories", [])
         if not isinstance(focus_categories, list):
@@ -243,15 +242,8 @@ class FinancialSetupService:
                 "monthly_income": int(monthly_income),
                 "income_frequency": profile.income_frequency,
                 "recurring_expenses": recurring_expenses,
-                "primary_goal": {
-                    "goal_type": goal_details.get("goal_type", goal_memory.category),
-                    "name": goal_details.get("name", goal_memory.title),
-                    "target_amount": goal_details.get(
-                        "target_amount", goal_memory.amount
-                    ),
-                    "current_amount": goal_details.get("current_amount", 0),
-                    "target_date": goal_details.get("target_date"),
-                },
+                "goals": goals,
+                "primary_goal_id": primary_goal_id or (goals[0]["id"] if goals else None),
                 "savings_priority": profile.savings_priority,
                 "focus_categories": focus_categories,
                 "financial_situation_notes": profile.financial_situation_notes,

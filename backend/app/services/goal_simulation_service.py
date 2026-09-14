@@ -42,8 +42,8 @@ class GoalSimulationService:
         )
         result.assumptions.extend(
             [
-                f"Dùng khoản tiết kiệm dự kiến từ ngân sách đang hoạt động của tháng {projection_date:%m/%Y}.",
-                "Dùng tiến độ hiện tại của mục tiêu đã lưu.",
+                f"Uses planned savings from the active budget for {projection_date:%m/%Y}.",
+                "Uses the saved goal's current progress.",
             ]
         )
         return result
@@ -97,7 +97,7 @@ class GoalSimulationService:
         try:
             amount = float(value)
         except (TypeError, ValueError) as exc:
-            raise ValueError(f"{field_name} must be a valid VND amount") from exc
+            raise ValueError(f"{field_name} must be a valid USD amount") from exc
         if amount < 0 or not amount.is_integer():
-            raise ValueError(f"{field_name} must be a non-negative whole VND amount")
+            raise ValueError(f"{field_name} must be a non-negative whole USD amount")
         return int(amount)

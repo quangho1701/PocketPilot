@@ -189,7 +189,7 @@ async def test_ai_failure_records_deterministic_fallback_provenance():
     session, engine = await _new_session()
     try:
         await _seed_user(session)
-        with patch("app.services.budget_service.bedrock_client.invoke_with_prompt", new_callable=AsyncMock, side_effect=RuntimeError("offline")):
+        with patch("app.services.budget_service.llm_client.invoke_with_prompt", new_callable=AsyncMock, side_effect=RuntimeError("offline")):
             draft = await BudgetService(session).generate_budget_proposal("user-1", 9, 2026, "ai_personalized")
         assert draft["budgeting_mode"] == "ai_personalized"
         assert draft["strategy_source"] == "deterministic_fallback"

@@ -125,6 +125,72 @@ class BudgetProposalUpdateRequest(BaseModel):
     allocations: Optional[list[BudgetAllocationUpdate]] = None
 
 
+class CategoryAllocationUpdateRequest(BaseModel):
+    amount: float = Field(ge=0)
+    apply_to_future: bool = True
+
+
+class CategoryHistoryPoint(BaseModel):
+    month: int
+    year: int
+    allocated_amount: float
+    spent_amount: float
+
+
+class CategoryDetailResponse(BaseModel):
+    budget: BudgetResponse
+    category: "BudgetCategoryResponse"
+    allocation: BudgetAllocationResponse
+    spent_amount: float
+    available_budget: float
+    average_12_months: float
+    apply_to_future: bool
+    history: list[CategoryHistoryPoint]
+
+
+class PlanGoalDraft(BaseModel):
+    key: str
+    name: str
+    target_amount: float
+    current_amount: float = 0
+    target_date: Optional[str] = None
+    goal_type: str = "other"
+    is_primary: bool = False
+
+
+class PlanGoalDraftState(BaseModel):
+    confirmed: bool
+    goals: list[PlanGoalDraft]
+
+
+class PlanGoalResponse(PlanGoalDraft):
+    id: str
+
+
+class PlanGoalCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+    target_amount: float = Field(gt=0)
+    current_amount: float = Field(default=0, ge=0)
+    target_date: Optional[str] = None
+    goal_type: str = Field(default="other", max_length=100)
+    is_primary: bool = False
+
+    @model_validator(mode="after")
+    def _current_not_above_target(self):
+        if self.current_amount > self.target_amount:
+            raise ValueError("current_amount cannot exceed target_amount")
+        return self
+
+
+class PlanGoalUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    target_amount: Optional[float] = Field(default=None, gt=0)
+    current_amount: Optional[float] = Field(default=None, ge=0)
+    target_date: Optional[str] = None
+    goal_type: Optional[str] = Field(default=None, max_length=100)
+    is_primary: Optional[bool] = None
+
+
 class BudgetCategoryCreate(BaseModel):
     slug: str = Field(min_length=1, max_length=80)
     name: str = Field(min_length=1, max_length=120)

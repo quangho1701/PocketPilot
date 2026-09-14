@@ -5,7 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AssistantScreen from '@/screens/assistant/AssistantScreen';
-import BudgetScreen from '@/screens/budget/BudgetScreen';
+import PlanNavigator from '@/screens/budget/PlanNavigator';
 import TransactionsScreen from '@/screens/transactions/TransactionsScreen';
 import FinancialSetupScreen from '@/screens/setup/FinancialSetupScreen';
 import TransactionLedgerScreen from '@/screens/transactions/TransactionLedgerScreen';
@@ -72,7 +72,7 @@ function MainTabs() {
         component={AssistantScreen}
         options={{ title: 'Cố vấn' }}
       />
-      <Tab.Screen name="Budget" component={BudgetScreen} options={{ title: 'Kế hoạch' }} />
+      <Tab.Screen name="Budget" component={PlanNavigator} options={{ title: 'Kế hoạch' }} />
       <Tab.Screen name="Analytics" component={AnalyticsScreen} options={{ title: 'Analytics' }} />
     </Tab.Navigator>
   );

@@ -9,6 +9,14 @@ const vndFormatter = new Intl.NumberFormat('vi-VN', {
   maximumFractionDigits: 0,
 });
 
+const usdFormatter = new Intl.NumberFormat('en-US', {
+  style: 'currency', currency: 'USD', maximumFractionDigits: 2,
+});
+
+const compactUsdFormatter = new Intl.NumberFormat('en-US', {
+  style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 1,
+});
+
 export function formatVnd(value: number): string {
   return `${vndFormatter.format(Math.round(value))} ₫`;
 }
@@ -18,11 +26,19 @@ export function formatCompactVnd(value: number): string {
   return `${compactVndFormatter.format(value)} ₫`;
 }
 
+export function formatUsd(value: number): string {
+  return usdFormatter.format(value);
+}
+
+export function formatCompactUsd(value: number): string {
+  return compactUsdFormatter.format(value);
+}
+
 export function formatMonthYear(value: string | null): string | null {
   if (!value) return null;
   const [year, month] = value.split('-').map(Number);
   if (!year || !month || month < 1 || month > 12) return null;
-  return new Intl.DateTimeFormat('vi-VN', { month: 'long', year: 'numeric' }).format(
+  return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(
     new Date(year, month - 1, 1)
   );
 }
