@@ -23,31 +23,36 @@ import {
   getMessages,
   recordDecision,
 } from '@/services/assistant';
-import { COLORS, SOFT_SHADOW } from '@/theme';
+import { COLORS, FONTS, SOFT_SHADOW } from '@/theme';
 import MessageBubble from './components/MessageBubble';
 
 const STARTER_PROMPTS = [
   {
     icon: 'headset-outline' as const,
-    label: 'Tai nghe 1,2 triệu có ổn không?',
-    prompt: 'Mình định mua tai nghe 1.200.000 ₫ hôm nay, có ổn không?',
+    label: 'Can I afford $120 headphones?',
+    prompt: 'Can I afford to spend $120 on headphones today?',
   },
   {
     icon: 'wallet-outline' as const,
-    label: 'Tuần này mình còn chi được bao nhiêu?',
-    prompt: 'Tuần này mình còn có thể chi linh hoạt bao nhiêu?',
+    label: 'How much can I spend this week?',
+    prompt: 'How much flexible spending do I have left this week?',
   },
   {
     icon: 'flag-outline' as const,
-    label: 'Khoản nào nên hoãn để giữ mục tiêu?',
-    prompt: 'Khoản mua nào mình nên hoãn để không ảnh hưởng mục tiêu?',
+    label: 'How would spending affect a goal?',
+    prompt: 'How would an additional $50 expense affect one of my goals?',
+  },
+  {
+    icon: 'trending-up-outline' as const,
+    label: 'What if I save more each month?',
+    prompt: 'How would saving an additional $25 per month change one of my goals?',
   },
 ];
 
 const CONTEXT_SIGNALS = [
-  { icon: 'wallet-outline' as const, label: 'Ngân sách' },
-  { icon: 'calendar-clear-outline' as const, label: 'Khoản sắp tới' },
-  { icon: 'flag-outline' as const, label: 'Mục tiêu' },
+  { icon: 'wallet-outline' as const, label: 'Budget' },
+  { icon: 'calendar-clear-outline' as const, label: 'Upcoming expenses' },
+  { icon: 'flag-outline' as const, label: 'Goals' },
 ];
 
 type Decision = 'buy' | 'wait' | 'skip';
@@ -118,7 +123,7 @@ export default function AssistantScreen() {
       setConversationId(response.conversation_id);
       setMessages((previous) => [...previous, response.message]);
     } catch {
-      setError('Chưa thể kết nối với cố vấn. Nội dung của bạn vẫn được giữ lại.');
+      setError('Could not connect to the assistant. Your message has been preserved.');
       setMessages((previous) => previous.filter((message) => message.id !== optimistic.id));
       setInput(text);
     } finally {
@@ -151,7 +156,7 @@ export default function AssistantScreen() {
         );
         setRecordedDecisions((previous) => ({ ...previous, [messageId]: decision }));
       } catch {
-        setError('Chưa ghi nhận được quyết định. Hãy thử lại sau một chút.');
+        setError('Could not record your decision. Please try again.');
       } finally {
         setSubmittingDecision(null);
       }
@@ -173,13 +178,13 @@ export default function AssistantScreen() {
             <Ionicons name="sparkles" size={20} color={COLORS.teal} />
           </View>
           <View style={styles.headerCopy}>
-            <Text style={styles.headerTitle}>Cố vấn chi tiêu</Text>
+            <Text style={styles.headerTitle}>Spending Assistant</Text>
             <View style={styles.statusRow}>
               <View style={[styles.statusDot, historySyncError && styles.statusDotWarning]} />
               <Text style={styles.statusText} numberOfLines={1}>
                 {historySyncError
-                  ? 'PocketPilot · chưa đồng bộ lịch sử'
-                  : 'PocketPilot · sẵn sàng phân tích'}
+                  ? 'PocketPilot · history not synced'
+                  : 'PocketPilot · ready to analyze'}
               </Text>
             </View>
           </View>
@@ -192,7 +197,7 @@ export default function AssistantScreen() {
               (thinking || loadingHistory) && styles.newChatButtonDisabled,
             ]}
             accessibilityRole="button"
-            accessibilityLabel="Bắt đầu cuộc trò chuyện mới"
+            accessibilityLabel="Start a new conversation"
           >
             <Ionicons name="create-outline" size={19} color={COLORS.textSecondary} />
           </Pressable>
@@ -205,7 +210,7 @@ export default function AssistantScreen() {
             </View>
             <View style={styles.historyLoadingBubble}>
               <ActivityIndicator size="small" color={COLORS.teal} />
-              <Text style={styles.historyLoadingText}>Đang mở cuộc trò chuyện…</Text>
+              <Text style={styles.historyLoadingText}>Opening conversation…</Text>
             </View>
           </View>
         ) : messages.length === 0 && !thinking ? (
@@ -216,7 +221,7 @@ export default function AssistantScreen() {
           >
             <View style={styles.dateDivider}>
               <View style={styles.dateDividerLine} />
-              <Text style={styles.dateDividerText}>Hôm nay</Text>
+              <Text style={styles.dateDividerText}>Today</Text>
               <View style={styles.dateDividerLine} />
             </View>
 
@@ -227,13 +232,13 @@ export default function AssistantScreen() {
               <View style={styles.welcomeColumn}>
                 <View style={styles.senderRow}>
                   <Text style={styles.senderName}>PocketPilot</Text>
-                  <Text style={styles.senderTime}>Bây giờ</Text>
+                  <Text style={styles.senderTime}>Now</Text>
                 </View>
                 <View style={styles.welcomeBubble}>
-                  <Text style={styles.welcomeTitle}>Chào bạn 👋</Text>
+                  <Text style={styles.welcomeTitle}>Hello 👋</Text>
                   <Text style={styles.welcomeText}>
-                    Bạn đang cân nhắc mua gì? Gửi mình tên món đồ và giá, mình sẽ giúp bạn
-                    quyết định trước khi chi.
+                    What purchase or goal are you considering? Share the situation and amount,
+                    and I’ll help you understand the impact before you decide.
                   </Text>
                   <View style={styles.signalList}>
                     {CONTEXT_SIGNALS.map((signal) => (
@@ -247,9 +252,9 @@ export default function AssistantScreen() {
                 <View style={styles.memoryNote}>
                   <Ionicons name="shield-checkmark" size={17} color={COLORS.teal} />
                   <View style={styles.memoryCopy}>
-                    <Text style={styles.memoryTitle}>Tư vấn theo hồ sơ của bạn</Text>
+                    <Text style={styles.memoryTitle}>Advice based on your profile</Text>
                     <Text style={styles.memoryText} numberOfLines={2}>
-                      Mình sẽ đối chiếu ngân sách, khoản sắp tới và mục tiêu đã lưu.
+                      I’ll compare your budget, upcoming expenses, and saved goals.
                     </Text>
                   </View>
                 </View>
@@ -258,8 +263,8 @@ export default function AssistantScreen() {
 
             <View style={styles.quickReplyBlock}>
               <View style={styles.quickReplyHeader}>
-                <Text style={styles.quickReplyTitle}>Bạn có thể hỏi</Text>
-                <Text style={styles.quickReplyMeta}>Chạm để gửi</Text>
+                <Text style={styles.quickReplyTitle}>Try asking</Text>
+                <Text style={styles.quickReplyMeta}>Tap to send</Text>
               </View>
               {STARTER_PROMPTS.map((item) => (
                 <Pressable
@@ -270,7 +275,7 @@ export default function AssistantScreen() {
                     pressed && styles.quickReplyPressed,
                   ]}
                   accessibilityRole="button"
-                  accessibilityLabel={`Gửi câu hỏi: ${item.label}`}
+                  accessibilityLabel={`Send question: ${item.label}`}
                 >
                   <View style={styles.quickReplyIcon}>
                     <Ionicons name={item.icon} size={16} color={COLORS.teal} />
@@ -306,7 +311,7 @@ export default function AssistantScreen() {
                   <View style={styles.thinkingBubble}>
                     <ActivityIndicator size="small" color={COLORS.teal} />
                     <Text style={styles.thinkingText}>
-                      Đang đối chiếu ngân sách và mục tiêu…
+                      Comparing your budget and goals…
                     </Text>
                   </View>
                 </View>
@@ -320,7 +325,7 @@ export default function AssistantScreen() {
             onPress={() => setError(null)}
             style={styles.errorBanner}
             accessibilityRole="button"
-            accessibilityLabel={`${error}. Chạm để đóng thông báo.`}
+            accessibilityLabel={`${error}. Tap to dismiss.`}
             accessibilityLiveRegion="assertive"
           >
             <Ionicons name="alert-circle-outline" size={18} color={COLORS.error} />
@@ -335,14 +340,14 @@ export default function AssistantScreen() {
               style={styles.input}
               value={input}
               onChangeText={setInput}
-              placeholder="Nhập món đồ và giá…"
+              placeholder="Ask about spending or a goal…"
               placeholderTextColor={COLORS.textMuted}
               selectionColor={COLORS.teal}
               multiline
               maxLength={1000}
               editable={!thinking && !loadingHistory}
-              accessibilityLabel="Câu hỏi cho cố vấn chi tiêu"
-              accessibilityHint="Ví dụ: Tai nghe 1 triệu 2, có nên mua hôm nay không?"
+              accessibilityLabel="Question for the financial assistant"
+              accessibilityHint="For example: How would spending $50 affect my goal?"
             />
             <Pressable
               style={({ pressed }) => [
@@ -357,7 +362,7 @@ export default function AssistantScreen() {
               onPress={handleSend}
               disabled={!input.trim() || thinking || loadingHistory}
               accessibilityRole="button"
-              accessibilityLabel="Gửi câu hỏi"
+              accessibilityLabel="Send question"
             >
               {thinking ? (
                 <ActivityIndicator size="small" color={COLORS.surface} />
@@ -368,8 +373,8 @@ export default function AssistantScreen() {
           </View>
           <Text style={styles.composerHint}>
             {loadingHistory
-              ? 'Đang đồng bộ cuộc trò chuyện…'
-              : 'AI có thể sai — hãy kiểm tra trước quyết định lớn.'}
+              ? 'Syncing conversation…'
+              : 'AI can make mistakes — verify before major decisions.'}
           </Text>
         </View>
       </KeyboardAvoidingView>
@@ -378,29 +383,29 @@ export default function AssistantScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: COLORS.surface },
-  container: { flex: 1, backgroundColor: COLORS.background },
+  safeArea: { flex: 1, backgroundColor: COLORS.parchment },
+  container: { flex: 1, backgroundColor: COLORS.parchment },
   header: {
     minHeight: 68,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    backgroundColor: COLORS.surface,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: COLORS.border,
+    backgroundColor: COLORS.parchment,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.borderStrong,
   },
   assistantAvatar: {
     width: 40,
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 20,
-    backgroundColor: COLORS.mint,
+    borderRadius: 0,
+    backgroundColor: COLORS.parchmentDeep,
     borderWidth: 1,
-    borderColor: '#CDEBE2',
+    borderColor: COLORS.greenDeep,
   },
   headerCopy: { flex: 1, marginLeft: 11 },
-  headerTitle: { color: COLORS.text, fontSize: 16, fontWeight: '900' },
+  headerTitle: { color: COLORS.text, fontFamily: FONTS.display, fontSize: 23 },
   statusRow: { flexDirection: 'row', alignItems: 'center', marginTop: 3 },
   statusDot: {
     width: 6,
@@ -416,8 +421,8 @@ const styles = StyleSheet.create({
     height: 38,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 19,
-    backgroundColor: COLORS.surfaceMuted,
+    borderRadius: 0,
+    backgroundColor: COLORS.parchmentDeep,
     borderWidth: 1,
     borderColor: COLORS.border,
   },
@@ -442,9 +447,8 @@ const styles = StyleSheet.create({
     minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 18,
-    borderTopLeftRadius: 6,
-    backgroundColor: COLORS.surface,
+    borderRadius: 0,
+    backgroundColor: COLORS.parchmentDeep,
     borderWidth: 1,
     borderColor: COLORS.border,
     paddingHorizontal: 14,
@@ -477,8 +481,8 @@ const styles = StyleSheet.create({
     height: 34,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 17,
-    backgroundColor: COLORS.mint,
+    borderRadius: 0,
+    backgroundColor: COLORS.parchmentDeep,
     borderWidth: 1,
     borderColor: '#CDEBE2',
     marginTop: 18,
@@ -493,15 +497,14 @@ const styles = StyleSheet.create({
   senderName: { color: COLORS.textSecondary, fontSize: 10, fontWeight: '800' },
   senderTime: { color: COLORS.textMuted, fontSize: 9, marginLeft: 7 },
   welcomeBubble: {
-    borderRadius: 20,
-    borderTopLeftRadius: 6,
-    backgroundColor: COLORS.surface,
+    borderRadius: 0,
+    backgroundColor: COLORS.parchmentDeep,
     borderWidth: 1,
     borderColor: COLORS.border,
     padding: 15,
     ...SOFT_SHADOW,
   },
-  welcomeTitle: { color: COLORS.text, fontSize: 15, fontWeight: '900', marginBottom: 6 },
+  welcomeTitle: { color: COLORS.text, fontFamily: FONTS.display, fontSize: 21, marginBottom: 6 },
   welcomeText: { color: COLORS.textSecondary, fontSize: 13, lineHeight: 19 },
   signalList: {
     flexDirection: 'row',
@@ -514,16 +517,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 15,
-    backgroundColor: COLORS.mintSoft,
+    borderRadius: 0,
+    borderWidth: 1,
+    borderColor: COLORS.greenDeep,
+    backgroundColor: COLORS.parchment,
     paddingHorizontal: 9,
   },
   signalText: { color: COLORS.tealDark, fontSize: 9.5, fontWeight: '700', marginLeft: 4 },
   memoryNote: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 13,
-    backgroundColor: COLORS.mintSoft,
+    borderRadius: 0,
+    borderWidth: 1,
+    borderColor: COLORS.greenDeep,
+    backgroundColor: COLORS.parchmentDeep,
     paddingHorizontal: 11,
     paddingVertical: 9,
     marginTop: 8,
@@ -550,10 +557,10 @@ const styles = StyleSheet.create({
     minHeight: 45,
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 18,
+    borderRadius: 0,
     borderWidth: 1,
     borderColor: COLORS.borderStrong,
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.parchment,
     paddingHorizontal: 9,
   },
   quickReplyPressed: { borderColor: COLORS.teal, backgroundColor: COLORS.mintSoft },
@@ -562,8 +569,8 @@ const styles = StyleSheet.create({
     height: 29,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 15,
-    backgroundColor: COLORS.mintSoft,
+    borderRadius: 0,
+    backgroundColor: COLORS.parchmentDeep,
   },
   quickReplyText: { flex: 1, color: COLORS.text, fontSize: 11.5, fontWeight: '700', marginHorizontal: 9 },
   messageList: { paddingVertical: 14 },
@@ -571,9 +578,8 @@ const styles = StyleSheet.create({
   thinkingBubble: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 16,
-    borderBottomLeftRadius: 5,
-    backgroundColor: COLORS.surface,
+    borderRadius: 0,
+    backgroundColor: COLORS.parchmentDeep,
     paddingHorizontal: 13,
     paddingVertical: 10,
     ...SOFT_SHADOW,
@@ -596,9 +602,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
   composerShell: {
-    backgroundColor: COLORS.surface,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: COLORS.border,
+    backgroundColor: COLORS.parchment,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.borderStrong,
     paddingHorizontal: 12,
     paddingTop: 8,
     paddingBottom: 6,
@@ -609,8 +615,8 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     borderWidth: 1,
     borderColor: COLORS.borderStrong,
-    borderRadius: 27,
-    backgroundColor: COLORS.surface,
+    borderRadius: 0,
+    backgroundColor: COLORS.parchmentDeep,
     paddingLeft: 16,
     paddingRight: 6,
     paddingVertical: 5,
@@ -631,8 +637,8 @@ const styles = StyleSheet.create({
     height: 42,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 21,
-    backgroundColor: COLORS.teal,
+    borderRadius: 0,
+    backgroundColor: COLORS.greenDeep,
   },
   sendPressed: { backgroundColor: COLORS.tealDark },
   sendDisabled: { backgroundColor: COLORS.borderStrong },

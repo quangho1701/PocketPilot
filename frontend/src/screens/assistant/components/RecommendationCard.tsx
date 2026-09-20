@@ -1,56 +1,50 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { ChatMessage } from '@/types';
-import { COLORS } from '@/theme';
+import { COLORS, FONTS } from '@/theme';
+import { formatUsd } from '@/utils/finance';
 
 type Verdict = 'buy' | 'wait' | 'skip';
 type IconName = keyof typeof Ionicons.glyphMap;
 
-const vndFormatter = new Intl.NumberFormat('vi-VN', {
-  maximumFractionDigits: 0,
-});
-
-function formatVnd(value: number): string {
-  return `${vndFormatter.format(Math.round(value))} ₫`;
-}
 
 const VERDICT_STYLES: Record<
   Verdict,
   { color: string; background: string; label: string; summary: string; icon: IconName }
 > = {
   buy: {
-    color: COLORS.success,
+    color: COLORS.greenDeep,
     background: COLORS.mintSoft,
-    label: 'CÓ THỂ MUA',
-    summary: 'Phù hợp với kế hoạch hiện tại',
+    label: 'OK TO BUY',
+    summary: 'Fits your current plan',
     icon: 'checkmark-circle',
   },
   wait: {
-    color: COLORS.amber,
+    color: COLORS.brass,
     background: COLORS.amberSoft,
-    label: 'NÊN CHỜ',
-    summary: 'Hoãn lại sẽ an toàn hơn',
+    label: 'WAIT',
+    summary: 'Delaying would be safer',
     icon: 'time',
   },
   skip: {
-    color: COLORS.error,
+    color: COLORS.oxblood,
     background: COLORS.errorSoft,
-    label: 'NÊN BỎ QUA',
-    summary: 'Ưu tiên ngân sách và mục tiêu',
+    label: 'SKIP',
+    summary: 'Prioritize your budget and goals',
     icon: 'close-circle',
   },
 };
 
 const DECISION_ACTIONS: { decision: Verdict; label: string; icon: IconName }[] = [
-  { decision: 'buy', label: 'Mình sẽ mua', icon: 'bag-check-outline' },
-  { decision: 'wait', label: 'Mình sẽ chờ', icon: 'time-outline' },
-  { decision: 'skip', label: 'Mình bỏ qua', icon: 'close-outline' },
+  { decision: 'buy', label: 'I’ll buy it', icon: 'bag-check-outline' },
+  { decision: 'wait', label: 'I’ll wait', icon: 'time-outline' },
+  { decision: 'skip', label: 'I’ll skip it', icon: 'close-outline' },
 ];
 
 const ANALYSIS_SOURCES: { label: string; icon: IconName }[] = [
-  { label: 'Ngân sách', icon: 'wallet-outline' },
-  { label: 'Khoản sắp tới', icon: 'calendar-clear-outline' },
-  { label: 'Mục tiêu', icon: 'flag-outline' },
+  { label: 'Budget', icon: 'wallet-outline' },
+  { label: 'Upcoming expenses', icon: 'calendar-clear-outline' },
+  { label: 'Goals', icon: 'flag-outline' },
 ];
 
 interface Props {
@@ -90,7 +84,7 @@ export default function RecommendationCard({
         <View style={styles.recordedBadge}>
           <Ionicons name="checkmark-circle" size={15} color={COLORS.success} />
           <Text style={styles.recordedText}>
-            {recordedLabel ? `Đã ghi nhớ: ${recordedLabel}` : 'Đã ghi nhớ quyết định của bạn'}
+            {recordedLabel ? `Saved: ${recordedLabel}` : 'Your decision was saved'}
           </Text>
         </View>
       ) : null}
@@ -101,9 +95,9 @@ export default function RecommendationCard({
             <Ionicons name="receipt-outline" size={18} color={COLORS.teal} />
           </View>
           <View style={styles.purchaseCopy}>
-            <Text style={styles.purchaseLabel}>Khoản đang cân nhắc</Text>
+            <Text style={styles.purchaseLabel}>Purchase under consideration</Text>
             <Text style={styles.item} numberOfLines={2}>
-              {message.item_description ?? 'Khoản mua này'}
+              {message.item_description ?? 'This purchase'}
             </Text>
           </View>
           {message.amount != null ? (
@@ -113,7 +107,7 @@ export default function RecommendationCard({
               adjustsFontSizeToFit
               minimumFontScale={0.72}
             >
-              {formatVnd(message.amount)}
+              {formatUsd(message.amount)}
             </Text>
           ) : null}
         </View>
@@ -123,7 +117,7 @@ export default function RecommendationCard({
         <View style={styles.reasoningBox}>
           <View style={styles.reasoningHeader}>
             <Ionicons name="analytics-outline" size={15} color={COLORS.teal} />
-            <Text style={styles.reasoningLabel}>Vì sao PocketPilot gợi ý vậy?</Text>
+            <Text style={styles.reasoningLabel}>Why does PocketPilot suggest this?</Text>
           </View>
           <Text style={styles.reasoning}>{message.reasoning}</Text>
           <View style={styles.sourceList}>
@@ -140,8 +134,8 @@ export default function RecommendationCard({
       {!decided ? (
         <>
           <View style={styles.decisionPrompt}>
-            <Text style={styles.prompt}>Bạn sẽ làm gì?</Text>
-            <Text style={styles.promptHint}>Mình sẽ ghi nhớ cho lần tư vấn sau</Text>
+            <Text style={styles.prompt}>What will you do?</Text>
+            <Text style={styles.promptHint}>I’ll remember this for future advice</Text>
           </View>
           <View style={styles.actions}>
             {DECISION_ACTIONS.map(({ decision, label, icon }) => {
@@ -162,7 +156,7 @@ export default function RecommendationCard({
                   disabled={Boolean(submitting)}
                   onPress={() => onDecision(message.id, decision)}
                   accessibilityRole="button"
-                  accessibilityLabel={`${label}${recommended ? ', theo gợi ý của PocketPilot' : ''}`}
+                  accessibilityLabel={`${label}${recommended ? ', recommended by PocketPilot' : ''}`}
                 >
                   {submitting === decision ? (
                     <ActivityIndicator
@@ -206,7 +200,9 @@ const styles = StyleSheet.create({
   verdictPanel: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 14,
+    borderRadius: 0,
+    borderWidth: 1,
+    borderColor: COLORS.borderStrong,
     padding: 10,
     marginBottom: 10,
   },
@@ -215,15 +211,17 @@ const styles = StyleSheet.create({
     height: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 18,
+    borderRadius: 0,
   },
   verdictCopy: { flex: 1, minWidth: 0, marginLeft: 9 },
-  verdictLabel: { fontSize: 10, fontWeight: '900', letterSpacing: 0.8 },
-  verdictSummary: { color: COLORS.text, fontSize: 11.5, fontWeight: '800', marginTop: 2 },
+  verdictLabel: { fontFamily: FONTS.mono, fontSize: 10, fontWeight: '900', letterSpacing: 0.8 },
+  verdictSummary: { color: COLORS.text, fontFamily: FONTS.display, fontSize: 16, marginTop: 2 },
   recordedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 11,
+    borderRadius: 0,
+    borderWidth: 1,
+    borderColor: COLORS.greenDeep,
     backgroundColor: COLORS.mintSoft,
     paddingHorizontal: 9,
     paddingVertical: 7,
@@ -233,7 +231,9 @@ const styles = StyleSheet.create({
   purchaseRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 13,
+    borderRadius: 0,
+    borderWidth: 1,
+    borderColor: COLORS.border,
     backgroundColor: COLORS.surfaceMuted,
     padding: 10,
     marginBottom: 10,
@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
     height: 34,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 11,
+    borderRadius: 0,
     backgroundColor: COLORS.mint,
   },
   purchaseCopy: { flex: 1, minWidth: 0, marginHorizontal: 9 },
@@ -277,7 +277,9 @@ const styles = StyleSheet.create({
   sourcePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 10,
+    borderRadius: 0,
+    borderWidth: 1,
+    borderColor: COLORS.border,
     backgroundColor: COLORS.surface,
     paddingHorizontal: 7,
     paddingVertical: 4,
@@ -298,7 +300,7 @@ const styles = StyleSheet.create({
     minHeight: 50,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 10,
+    borderRadius: 0,
     borderWidth: 1,
     borderColor: COLORS.borderStrong,
     backgroundColor: COLORS.surface,

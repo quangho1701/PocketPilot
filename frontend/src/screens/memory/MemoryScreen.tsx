@@ -19,6 +19,7 @@ import type { MainTabParamList, RootStackParamList } from '@/navigation/types';
 import { getFinancialSetup } from '@/services/setup';
 import { CARD_SHADOW, COLORS, RADII, SOFT_SHADOW } from '@/theme';
 import type { FinancialSetupPayload, SavingsPriority } from '@/types/setup';
+import { getPrimaryGoal } from '@/types/setup';
 import {
   CATEGORY_LABELS,
   GOAL_LABELS,
@@ -312,7 +313,7 @@ export default function MemoryScreen({ navigation }: Props) {
     : null;
   const signalStyle = cashFlowSignal ? SIGNAL_COLORS[cashFlowSignal.tone] : null;
 
-  const goal = setup?.primary_goal ?? null;
+  const goal = getPrimaryGoal(setup);
   const goalProgress = goal
     ? Math.min(Math.max((goal.current_amount / goal.target_amount) * 100, 0), 100)
     : 0;

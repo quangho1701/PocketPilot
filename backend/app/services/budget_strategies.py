@@ -162,10 +162,12 @@ class ZeroBasedStrategy(BudgetProposal):
 class CustomStrategy(BudgetProposal):
     async def generate(self, context: dict) -> dict:
         allocations = context.get("allocations", [])
+        allocation_total = sum(max(float(item.get("amount", 0.0)), 0.0) for item in allocations)
+        income = max(float(context.get("total_income", 0.0)), 0.0)
         return {
             "strategy": "custom",
-            "total_income": float(context.get("total_income", 0.0)),
-            "planned_savings": float(context.get("planned_savings", 0.0)),
+            "total_income": income,
+            "planned_savings": round(max(income - allocation_total, 0.0), 2),
             "allocations": [
                 {
                     "category_slug": item.get("category_slug", item.get("category_id", "miscellaneous")),

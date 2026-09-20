@@ -9,7 +9,12 @@ if "sslmode=disable" in settings.database_url:
 
 _db_url = settings.database_url.replace("?sslmode=disable", "").replace("&sslmode=disable", "")
 
-engine = create_async_engine(_db_url, echo=False, connect_args=_connect_args)
+_engine_options = {"echo": False, "connect_args": _connect_args}
+if _db_url.startswith("cockroachdb+"):
+    # CockroachDB's retry model and DDL behavior assume serializable
+    # transactions. Pass this as an engine option rather than a URL argument.
+    _engine_options["isolation_level"] = "SERIALIZABLE"
+engine = create_async_engine(_db_url, **_engine_options)
 
 AsyncSessionLocal = async_sessionmaker(
     engine,

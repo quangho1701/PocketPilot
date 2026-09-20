@@ -96,8 +96,8 @@ def upgrade() -> None:
     op.create_index("idx_me_memory_id", "memory_embeddings", ["memory_id"])
 
     # Vector index for approximate nearest-neighbor search.
-    # CockroachDB v24.1 supports HNSW vector indexes.
-    # If this fails on your version, comment it out — brute-force ORDER BY <=> is the fallback.
+    # Vector storage is supported from CockroachDB v24.2; HNSW support can
+    # vary by version, so brute-force ORDER BY <=> remains the fallback.
     try:
         op.execute("""
             CREATE INDEX idx_me_vector

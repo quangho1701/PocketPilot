@@ -19,6 +19,7 @@ import type { MainTabParamList, RootStackParamList } from '@/navigation/types';
 import { getFinancialSetup } from '@/services/setup';
 import { CARD_SHADOW, COLORS, RADII, SOFT_SHADOW } from '@/theme';
 import type { FinancialSetupPayload, RecurringExpenseInput } from '@/types/setup';
+import { getPrimaryGoal } from '@/types/setup';
 import {
   CATEGORY_LABELS,
   GOAL_LABELS,
@@ -176,7 +177,7 @@ export default function TransactionsScreen({ navigation, route }: Props) {
   const totalRecurring = useMemo(() => recurringTotal(setup), [setup]);
   const monthlyIncome = setup?.monthly_income ?? 0;
   const available = monthlyIncome - totalRecurring;
-  const goal = setup?.primary_goal ?? null;
+  const goal = getPrimaryGoal(setup);
   const goalProgress = goal?.target_amount
     ? Math.min(100, Math.max(0, Math.round((goal.current_amount / goal.target_amount) * 100)))
     : 0;
@@ -320,14 +321,14 @@ export default function TransactionsScreen({ navigation, route }: Props) {
           <QuickAction
             icon="scan-outline"
             title="Quét hóa đơn"
-            description="Chưa kết nối OCR"
-            onPress={() => setFeatureNotice(OCR_NOTICE)}
+            description="Mở luồng OCR"
+            onPress={() => rootNavigation?.navigate('TransactionLedger', { mode: 'scan' })}
           />
           <QuickAction
             icon="add-outline"
             title="Thêm giao dịch"
-            description="API đang hoàn thiện"
-            onPress={() => setFeatureNotice(ADD_TRANSACTION_NOTICE)}
+            description="Ghi vào sổ chi tiêu"
+            onPress={() => rootNavigation?.navigate('TransactionLedger', { mode: 'create' })}
           />
         </View>
 

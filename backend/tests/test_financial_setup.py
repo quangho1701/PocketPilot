@@ -22,7 +22,7 @@ def setup_data(
     *, monthly_income: int = 20_000_000, recurring_count: int = 2
 ) -> dict:
     return {
-        "currency": "VND",
+        "currency": "USD",
         "monthly_income": monthly_income,
         "income_frequency": "monthly",
         "recurring_expenses": [
@@ -58,7 +58,7 @@ class FinancialSetupSchemaTests(unittest.TestCase):
         invalid_cases = []
 
         wrong_currency = setup_data()
-        wrong_currency["currency"] = "USD"
+        wrong_currency["currency"] = "EUR"
         invalid_cases.append(wrong_currency)
 
         fractional_income = setup_data()
@@ -196,7 +196,7 @@ class FinancialSetupServiceTests(unittest.IsolatedAsyncioTestCase):
             memory for memory in memories if memory.memory_type.value == "goal"
         )
         self.assertEqual(goal_memory.details["current_amount"], 5_000_000)
-        self.assertEqual(goal_memory.details["currency"], "VND")
+        self.assertEqual(goal_memory.details["currency"], "USD")
 
     async def test_repeated_put_replaces_active_memories_idempotently(self) -> None:
         async with self.session_factory() as session:

@@ -5,6 +5,7 @@ from app.schemas.assistant import (
     ConversationResponse,
     MessageDecisionRequest,
 )
+from app.schemas.auth import TokenResponse, UserRegister, UserResponse
 from app.schemas.common import (
     ErrorResponse,
     PaginatedResponse,
@@ -48,7 +49,16 @@ from app.schemas.budget import (
     BudgetAllocationResponse,
     BudgetCreate,
     BudgetResponse,
-    BudgetSimulationRequest,
+)
+from app.schemas.transaction import (
+    DashboardCategorySummary,
+    DashboardResponse,
+    ReceiptOCRResponse,
+    TransactionCreate,
+    TransactionFilter,
+    TransactionListResponse,
+    TransactionResponse,
+    TransactionUpdate,
 )
 
 __all__ = [
@@ -57,6 +67,9 @@ __all__ = [
     "ChatResponse",
     "ConversationResponse",
     "MessageDecisionRequest",
+    "TokenResponse",
+    "UserRegister",
+    "UserResponse",
     "ErrorResponse",
     "PaginatedResponse",
     "PaginationParams",
@@ -87,5 +100,12 @@ __all__ = [
     "BudgetAllocationResponse",
     "BudgetCreate",
     "BudgetResponse",
-    "BudgetSimulationRequest",
+    "TransactionCreate",
+    "DashboardCategorySummary",
+    "DashboardResponse",
+    "ReceiptOCRResponse",
+    "TransactionFilter",
+    "TransactionListResponse",
+    "TransactionResponse",
+    "TransactionUpdate",
 ]

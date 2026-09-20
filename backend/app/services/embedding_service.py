@@ -6,10 +6,9 @@ from typing import Optional
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
 from app.models.financial_memory import FinancialMemory, MemoryType
 from app.models.memory_embedding import MemoryEmbedding
-from app.utils.llm import embedding_client
+from app.utils.llm import embedding_client, embedding_model_id
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +38,7 @@ class EmbeddingService:
                 {
                     "txt": text_content,
                     "vec": str(vector),
-                    "mv": settings.bedrock_embedding_model_id,
+                    "mv": embedding_model_id,
                     "mid": memory_id,
                 },
             )
@@ -51,7 +50,7 @@ class EmbeddingService:
                 memory_id=memory_id,
                 embedding_text=text_content,
                 embedding=vector,
-                model_version=settings.bedrock_embedding_model_id,
+                model_version=embedding_model_id,
             )
             self.db.add(embedding)
             await self.db.flush()

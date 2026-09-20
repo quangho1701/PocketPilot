@@ -2,3 +2,7 @@
 
 # Async SQLite driver used by the isolated setup service/API integration tests.
 aiosqlite==0.20.0
+
+# Test runner and async test support for backend service tests.
+pytest>=8.4,<10
+pytest-asyncio>=1.0,<2

@@ -5,6 +5,9 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
+BudgetingMode = Literal["50_30_20", "zero_based", "custom", "ai_personalized"]
+BudgetStatus = Literal["draft", "active", "archived"]
+
 
 class BudgetAllocationCreate(BaseModel):
     category_slug: Optional[str] = Field(default=None, min_length=1, max_length=80)
@@ -47,8 +50,8 @@ class BudgetCreate(BaseModel):
     year: int = Field(ge=2000)
     total_income: float = Field(ge=0)
     planned_savings: float = Field(ge=0)
-    status: str = Field(default="draft", max_length=20)
-    budgeting_mode: str = Field(default="50_30_20", max_length=30)
+    status: Literal["draft"] = "draft"
+    budgeting_mode: BudgetingMode = "50_30_20"
     strategy_source: str = Field(default="deterministic", max_length=30)
     allocations: list[BudgetAllocationCreate] = Field(default_factory=list)
 
@@ -60,8 +63,8 @@ class BudgetResponse(BaseModel):
     year: int
     total_income: float
     planned_savings: float
-    status: str
-    budgeting_mode: str
+    status: BudgetStatus
+    budgeting_mode: BudgetingMode
     strategy_source: str
     approved_at: Optional[datetime]
     allocations: list[BudgetAllocationResponse]
@@ -69,13 +72,6 @@ class BudgetResponse(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
-
-
-class BudgetSimulationRequest(BaseModel):
-    target_amount: float = Field(ge=0)
-    monthly_contribution: float = Field(ge=0)
-    months: int = Field(ge=1, le=120)
-    current_savings: float = Field(ge=0)
 
 
 class BudgetAllocationProposal(BaseModel):
@@ -103,7 +99,7 @@ class BudgetProposalPayload(BaseModel):
 class BudgetGenerationRequest(BaseModel):
     month: int = Field(ge=1, le=12)
     year: int = Field(ge=2000)
-    budgeting_mode: str = Field(default="50_30_20")
+    budgeting_mode: BudgetingMode = "50_30_20"
     user_id: Optional[str] = None
     custom_allocations: list[BudgetAllocationUpdate] = Field(default_factory=list)
 
@@ -120,13 +116,79 @@ class BudgetAdjustmentRequest(BaseModel):
 class BudgetProposalGenerateRequest(BaseModel):
     month: int = Field(ge=1, le=12)
     year: int = Field(ge=2000)
-    budgeting_mode: Literal["50_30_20", "zero_based", "custom", "ai_personalized"]
+    budgeting_mode: BudgetingMode
     custom_allocations: list[BudgetAllocationUpdate] = Field(default_factory=list)
 
 
 class BudgetProposalUpdateRequest(BaseModel):
     planned_savings: Optional[float] = Field(default=None, ge=0)
     allocations: Optional[list[BudgetAllocationUpdate]] = None
+
+
+class CategoryAllocationUpdateRequest(BaseModel):
+    amount: float = Field(ge=0)
+    apply_to_future: bool = True
+
+
+class CategoryHistoryPoint(BaseModel):
+    month: int
+    year: int
+    allocated_amount: float
+    spent_amount: float
+
+
+class CategoryDetailResponse(BaseModel):
+    budget: BudgetResponse
+    category: "BudgetCategoryResponse"
+    allocation: BudgetAllocationResponse
+    spent_amount: float
+    available_budget: float
+    average_12_months: float
+    apply_to_future: bool
+    history: list[CategoryHistoryPoint]
+
+
+class PlanGoalDraft(BaseModel):
+    key: str
+    name: str
+    target_amount: float
+    current_amount: float = 0
+    target_date: Optional[str] = None
+    goal_type: str = "other"
+    is_primary: bool = False
+
+
+class PlanGoalDraftState(BaseModel):
+    confirmed: bool
+    goals: list[PlanGoalDraft]
+
+
+class PlanGoalResponse(PlanGoalDraft):
+    id: str
+
+
+class PlanGoalCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+    target_amount: float = Field(gt=0)
+    current_amount: float = Field(default=0, ge=0)
+    target_date: Optional[str] = None
+    goal_type: str = Field(default="other", max_length=100)
+    is_primary: bool = False
+
+    @model_validator(mode="after")
+    def _current_not_above_target(self):
+        if self.current_amount > self.target_amount:
+            raise ValueError("current_amount cannot exceed target_amount")
+        return self
+
+
+class PlanGoalUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    target_amount: Optional[float] = Field(default=None, gt=0)
+    current_amount: Optional[float] = Field(default=None, ge=0)
+    target_date: Optional[str] = None
+    goal_type: Optional[str] = Field(default=None, max_length=100)
+    is_primary: Optional[bool] = None
 
 
 class BudgetCategoryCreate(BaseModel):

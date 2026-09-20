@@ -35,12 +35,19 @@ class GeminiClient:
                 parts = [{"text": content}]
             contents.append({"role": role, "parts": parts})
 
+        generation_config: dict = {
+            "maxOutputTokens": max_tokens,
+            "temperature": temperature,
+        }
+        # Gemini 3.x spends part of maxOutputTokens on internal reasoning.
+        # Categorization and other short structured responses need a minimal
+        # thinking level so the answer is not cut off before JSON is emitted.
+        if self._model.startswith("gemini-3"):
+            generation_config["thinkingConfig"] = {"thinkingLevel": "minimal"}
+
         body: dict = {
             "contents": contents,
-            "generationConfig": {
-                "maxOutputTokens": max_tokens,
-                "temperature": temperature,
-            },
+            "generationConfig": generation_config,
         }
         if system:
             body["systemInstruction"] = {"parts": [{"text": system}]}
